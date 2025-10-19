@@ -5,8 +5,7 @@
   <title>BiteCode Mentor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.6.1/dist/lib.umd.js"></script>
-  <script src="./aimentor.js"></script>
+
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -14,6 +13,7 @@
       color: #222;
       padding: 2rem;
     }
+
     #chatLog {
       background: #fff;
       border-radius: 10px;
@@ -21,14 +21,29 @@
       padding: 1rem;
       height: 350px;
       overflow-y: auto;
+      margin-top: 1rem;
+    }
+
+    h1 {
+      margin-bottom: 0.3rem;
+    }
+
+    p {
+      margin-top: 0;
+      color: #555;
     }
   </style>
 </head>
+
 <body>
   <h1>🎓 BiteCode Mentor</h1>
   <p>AI-powered conversational lesson interface</p>
 
+  <!-- The chat container -->
   <div id="chatLog">Initializing...</div>
 
+  <!-- Load scripts AFTER the DOM is built -->
+  <script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.6.1/dist/lib.umd.js"></script>
+  <script src="./aimentor.js"></script>
 </body>
 </html>
