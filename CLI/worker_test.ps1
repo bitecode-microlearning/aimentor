@@ -1,6 +1,19 @@
 # ==== CONFIG ====
-$workerUrl = "https://aimentor-worker.workers.dev/lesson"
-$hmacSecret = "YOUR_HMAC_SECRET_HERE"   # <-- replace with your real HMAC secret
+$workerUrl = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev"
+# read -hmac <secret> from command line (supports -hmac or --hmac)
+$hmacSecret = $null
+for ($i = 0; $i -lt $args.Count; $i++) {
+    if ($args[$i] -eq '-hmac' -or $args[$i] -eq '--hmac') {
+        if ($i + 1 -lt $args.Count) {
+            $hmacSecret = $args[$i + 1]
+            break
+        }
+    }
+}
+if (-not $hmacSecret) {
+    Write-Host "Usage: .\worker_test.ps1 -hmac <secret>"
+    exit 1
+}
 
 # ==== 1. Lesson JSON ====
 $lesson = @{
@@ -9,6 +22,7 @@ $lesson = @{
     userfirstname  = "Luca"
     content        = "Intro to loops in Python"
     knowledgelevel = "beginner"
+    timestamp      = [int][double]::Parse((Get-Date -UFormat %s))  # epoch seconds
 }
 $json = $lesson | ConvertTo-Json -Compress
 
