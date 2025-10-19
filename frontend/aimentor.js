@@ -1,10 +1,6 @@
-// Make sure the ElevenLabs client script is loaded in your HTML before this file:
-// <script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.6.1/dist/lib.umd.js"></script>
-// <script src="./aimentor.js"></script>
-
+// Make sure the ElevenLabs client script is loaded before this file
 const chatLog = document.getElementById("chatLog");
 
-// Utility function to append messages to the chat window
 const addMsg = (sender, msg) => {
   const div = document.createElement("div");
   div.innerHTML = `<b>${sender}:</b> ${msg}`;
@@ -12,14 +8,12 @@ const addMsg = (sender, msg) => {
   chatLog.scrollTop = chatLog.scrollHeight;
 };
 
-// Cloudflare Worker endpoint (must include protocol)
 const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev";
 
 (async () => {
   addMsg("System", "Requesting signed session from Worker...");
 
   try {
-    // Request the signed URL from the Cloudflare Worker
     const res = await fetch(WORKER_URL);
     const data = await res.json();
 
@@ -29,36 +23,34 @@ const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev
       return;
     }
 
-    // Extract the conversation signature from the signed URL
     const sigMatch = data.signed_url.match(/conversation_signature=([^&]+)/);
-    if (!sigMatch) {
-      addMsg("⚠️", "Signed URL did not contain a conversation signature.");
+    const agentMatch = data.signed_url.match(/agent_id=([^&]+)/);
+    if (!sigMatch || !agentMatch) {
+      addMsg("⚠️", "Invalid signed URL format.");
       console.error("Signed URL:", data.signed_url);
       return;
     }
+
     const signature = sigMatch[1];
+    const agentId = decodeURIComponent(agentMatch[1]);
 
-    // Extract the agent ID from the signed URL
-    let agentId = null;
-    const agentMatch = data.signed_url.match(/agent_id=([^&]+)/);
-    if (agentMatch) agentId = decodeURIComponent(agentMatch[1]);
-
-    if (!agentId) {
-      addMsg("⚠️", "Agent ID not found in signed URL.");
-      console.error("No agent id found in signed_url.");
-      return;
+    // Wait until the SDK is fully loaded
+    while (!window.client && !window.ElevenLabs) {
+      await new Promise(r => setTimeout(r, 100));
     }
 
-    // Verify that the ElevenLabs client was loaded successfully
-    const globalClient = window.client || window.ElevenLabs || {};
-    const { Conversation } = globalClient;
+    // Find the correct Conversation object
+    const Conversation =
+      (window.ElevenLabs?.client?.Conversation) ||
+      (window.client?.Conversation) ||
+      (window.ElevenLabs?.Conversation);
+
     if (!Conversation) {
-      addMsg("⚠️", "ElevenLabs client not found. Did you include the script tag?");
-      console.error("Global ElevenLabs object:", globalClient);
+      addMsg("⚠️", "ElevenLabs client not found.");
+      console.error("Globals:", Object.keys(window));
       return;
     }
 
-    // Start the ElevenLabs Conversation (no API key needed on frontend)
     const conversation = await Conversation.startSession({
       agentId,
       conversationSignature: signature,
