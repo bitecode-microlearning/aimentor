@@ -1,5 +1,2 @@
-name = "aimentor"
+name = "aimentor-app"
 compatibility_date = "2025-10-19"
-
-# ✅ Cloudflare Pages specific setting
-pages_build_output_dir = "./"
