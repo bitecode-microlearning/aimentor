@@ -1,5 +1,5 @@
 # ==== CONFIG ====
-$workerUrl = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev"
+$workerUrl = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/lesson"
 # read -hmac <secret> from command line (supports -hmac or --hmac)
 $hmacSecret = $null
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -27,11 +27,11 @@ $lesson = @{
 $json = $lesson | ConvertTo-Json -Compress
 
 # ==== 2. Compress (gzip) ====
-Add-Type -AssemblyName System.IO.Compression.FileSystem
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
 $ms = New-Object System.IO.MemoryStream
-$gzip = New-Object System.IO.Compression.GzipStream($ms, [IO.Compression.CompressionMode]::Compress)
+$gzip = New-Object System.IO.Compression.GzipStream($ms, [IO.Compression.CompressionMode]::Compress, $true)
 $gzip.Write($bytes, 0, $bytes.Length)
+$gzip.Flush()
 $gzip.Close()
 $compressed = $ms.ToArray()
 $ms.Close()
@@ -46,7 +46,7 @@ $hashBytes = $hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($encoded))
 $sig = -join ($hashBytes | ForEach-Object { $_.ToString("x2") })
 
 # ==== 5. Build URL and test ====
-$url = "$workerUrl?data=$([Uri]::EscapeDataString($encoded))&sig=$sig"
+$url = "$($workerUrl)?data=$([Uri]::EscapeDataString($encoded))&sig=$sig"
 Write-Host "`n➡️  Testing worker URL:`n$url`n"
 
 $response = Invoke-RestMethod -Uri $url -Method GET -ErrorAction Stop

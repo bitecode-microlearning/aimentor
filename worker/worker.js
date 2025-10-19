@@ -32,22 +32,29 @@ export default {
         });
       }
 
-      // Compute expected HMAC
-      const key = await crypto.subtle.importKey(
-        "raw",
-        new TextEncoder().encode(env.HMAC_SECRET),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign", "verify"]
-      );
-      const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encoded));
-      const expectedSig = Array.from(new Uint8Array(expectedSigBuffer))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
+      try {
+        // Compute expected HMAC
+        const key = await crypto.subtle.importKey(
+          "raw",
+          new TextEncoder().encode(env.HMAC_SECRET),
+          { name: "HMAC", hash: "SHA-256" },
+          false,
+          ["sign", "verify"]
+        );
+        const expectedSigBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(encoded));
+        const expectedSig = Array.from(new Uint8Array(expectedSigBuffer))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
 
-      if (expectedSig !== signature) {
-        return new Response(JSON.stringify({ error: "Invalid signature" }), {
-          status: 403,
+        if (expectedSig !== signature) {
+          return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        return new Response(JSON.stringify({ error: "Encryption error", details: err.message }), {
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
