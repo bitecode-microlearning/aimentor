@@ -70,20 +70,23 @@ export default {
       }
 
       try {
-        // Base64 decode → Gzip decompress → parse JSON
+        // Base64 decode → Uint8Array
         const binaryString = atob(encoded);
-        const byteArray = Uint8Array.from(binaryString, (c) => c.charCodeAt(0));
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
 
-        // ✅ Javított gzip decompress
+        // ✅ Cloudflare-safe gzip decompress
         const ds = new DecompressionStream("gzip");
-        const stream = new Blob([byteArray]).stream().pipeThrough(ds);
-        const decompressedText = await new Response(stream).text();
+        const gzipStream = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+        const decompressedText = await gzipStream.text();
 
         const lessonData = JSON.parse(decompressedText);
 
-        // --- ✅ 30-days expiry check ---
-        const now = Date.now() / 1000; // seconds
-        const maxAge = 60 * 60 * 24 * 30; // 30 days in seconds
+        // --- ✅ 30 napos lejárati ellenőrzés ---
+        const now = Date.now() / 1000;
+        const maxAge = 60 * 60 * 24 * 30;
         const ts = lessonData.timestamp;
 
         if (!ts || now - ts > maxAge) {
@@ -96,12 +99,14 @@ export default {
         return new Response(JSON.stringify(lessonData), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+
       } catch (err) {
-        return new Response(JSON.stringify({ error: "Decompression error", details: err.message }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Decompression error", details: err.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+
     }
 
     return new Response(JSON.stringify({ error: "Not found" }), {
