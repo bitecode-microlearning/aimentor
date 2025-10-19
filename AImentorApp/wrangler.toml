@@ -1,2 +1,3 @@
 name = "aimentor-app"
 compatibility_date = "2025-10-19"
+pages_build_output_dir = "./dist"
