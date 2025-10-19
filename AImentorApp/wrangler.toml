@@ -3,7 +3,3 @@ compatibility_date = "2025-10-19"
 
 # ✅ Cloudflare Pages specific setting
 pages_build_output_dir = "dist"
-
-# ✅ Optional (ha buildelni is akarod)
-[build]
-command = "npm run build"
