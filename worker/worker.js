@@ -13,6 +13,16 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
+    const requiredEnv = ["ELEVENLABS_AGENT_ID", "ELEVENLABS_API_KEY", "HMAC_SECRET"];
+    const missingEnv = requiredEnv.filter((key) => !env[key]);
+
+    if (missingEnv.length > 0) {
+      return new Response(
+        JSON.stringify({ error: "Missing environment variables", missing: missingEnv }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // --- 🔹 1. ElevenLabs agent endpoint ---
     if (pathname === "/agent") {
       const apiUrl = `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(env.ELEVENLABS_AGENT_ID)}`;
@@ -63,12 +73,15 @@ export default {
         // Base64 decode → Gzip decompress → parse JSON
         const binaryString = atob(encoded);
         const byteArray = Uint8Array.from(binaryString, (c) => c.charCodeAt(0));
+
+        // ✅ Javított gzip decompress
         const ds = new DecompressionStream("gzip");
-        const decompressedStream = new Response(byteArray.stream().pipeThrough(ds));
-        const decompressedText = await decompressedStream.text();
+        const stream = new Blob([byteArray]).stream().pipeThrough(ds);
+        const decompressedText = await new Response(stream).text();
+
         const lessonData = JSON.parse(decompressedText);
 
-        // --- ✅ 30-days expirty check ---
+        // --- ✅ 30-days expiry check ---
         const now = Date.now() / 1000; // seconds
         const maxAge = 60 * 60 * 24 * 30; // 30 days in seconds
         const ts = lessonData.timestamp;
