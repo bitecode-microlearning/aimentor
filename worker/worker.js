@@ -3,14 +3,23 @@ export default {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
 
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "https://aimentor.pages.dev",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
+    const allowedOrigins = ["https://aimentor.pages.dev"];
+    const origin = request.headers.get("Origin");
+    const referer = request.headers.get("Referer");
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders });
+    if (!origin && !referer) {
+      // közvetlen URL-megnyitás (címsorba beírva) → tiltjuk
+      return new Response(JSON.stringify({ error: "Direct browser access not allowed" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (origin && !allowedOrigins.includes(origin)) {
+      return new Response(JSON.stringify({ error: "Forbidden origin" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const requiredEnv = ["ELEVENLABS_AGENT_ID", "ELEVENLABS_API_KEY", "HMAC_SECRET"];
