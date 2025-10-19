@@ -39,11 +39,9 @@
   <h1>🎓 BiteCode Mentor</h1>
   <p>AI-powered conversational lesson interface</p>
 
-  <!-- The chat container -->
   <div id="chatLog">Initializing...</div>
 
-  <!-- Load scripts AFTER the DOM is built -->
-  <script src="https://cdn.jsdelivr.net/npm/@elevenlabs/client@0.6.1/dist/lib.umd.js"></script>
-  <script src="./aimentor.js"></script>
+  <!-- Use the official ElevenLabs ESM build -->
+  <script type="module" src="./aimentor.js"></script>
 </body>
 </html>

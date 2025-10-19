@@ -1,16 +1,20 @@
-// Make sure the ElevenLabs client script is loaded before this file
+// ESM import ensures the latest ElevenLabs SDK with correct conversation_signature support
+import { Conversation } from "https://esm.sh/@elevenlabs/client@latest";
+
 const chatLog = document.getElementById("chatLog");
 
-const addMsg = (sender, msg) => {
+// Helper to print messages to the chat log
+function addMsg(sender, msg) {
   const div = document.createElement("div");
   div.innerHTML = `<b>${sender}:</b> ${msg}`;
   chatLog.appendChild(div);
   chatLog.scrollTop = chatLog.scrollHeight;
-};
+}
 
+// Cloudflare Worker endpoint returning the signed URL
 const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev";
 
-(async () => {
+async function startMentor() {
   addMsg("System", "Requesting signed session from Worker...");
 
   try {
@@ -23,6 +27,7 @@ const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev
       return;
     }
 
+    // Parse agent_id and conversation_signature
     const sigMatch = data.signed_url.match(/conversation_signature=([^&]+)/);
     const agentMatch = data.signed_url.match(/agent_id=([^&]+)/);
     if (!sigMatch || !agentMatch) {
@@ -34,23 +39,7 @@ const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev
     const signature = sigMatch[1];
     const agentId = decodeURIComponent(agentMatch[1]);
 
-    // Wait until the SDK is fully loaded
-    while (!window.client && !window.ElevenLabs) {
-      await new Promise(r => setTimeout(r, 100));
-    }
-
-    // Find the correct Conversation object
-    const Conversation =
-      (window.ElevenLabs?.client?.Conversation) ||
-      (window.client?.Conversation) ||
-      (window.ElevenLabs?.Conversation);
-
-    if (!Conversation) {
-      addMsg("⚠️", "ElevenLabs client not found.");
-      console.error("Globals:", Object.keys(window));
-      return;
-    }
-
+    // Create a new conversation session using ElevenLabs SDK
     const conversation = await Conversation.startSession({
       agentId,
       conversationSignature: signature,
@@ -67,4 +56,6 @@ const WORKER_URL = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev
     console.error("Error:", err);
     addMsg("❌", "Unexpected error occurred. See console for details.");
   }
-})();
+}
+
+startMentor();
