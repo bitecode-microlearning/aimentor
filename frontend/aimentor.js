@@ -37,6 +37,7 @@ async function startMentor() {
     }
 
     const signature = sigMatch[1];
+    console.log("Conversation Signature:", signature);
     const agentId = decodeURIComponent(agentMatch[1]);
 
     // Create a new conversation session using ElevenLabs SDK
