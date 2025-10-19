@@ -2,22 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import path from 'path'
 
-// ✅ Cloudflare Pages-safe Vite config
-export default defineConfig({
-  plugins: [react()],
-  // 🔹 right path for asset
-  base: './',
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: true,
-  },
-})
-
   export default defineConfig({
     plugins: [react()],
     resolve: {
