@@ -1,6 +1,19 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    
+    // Handle preflight OPTIONS request for CORS
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "Access-Control-Allow-Origin": "https://aimentor.pages.dev", // or restrict to your domain
+          "Access-Control-Allow-Methods": "GET, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      });
+    }
+    
     // Prefer an agent id from Cloudflare environment variables; fall back to query param
     const agentId = env.ELEVENLABS_AGENT_ID || url.searchParams.get("agent_id");
     if (!agentId) {
