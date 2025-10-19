@@ -1,0 +1,6 @@
+name = "aimentor-app"
+compatibility_date = "2025-10-19"
+
+[build]
+command = "npm run build"
+upload = { directory = "./dist" }
