@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
+
 import Header from "./components/Header";
 import LessonContent from "./components/LessonContent";
 import MentorPanel from "./components/MentorPanel";
