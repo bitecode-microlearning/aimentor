@@ -1,5 +1,5 @@
 # ==== CONFIG ====
-$workerUrl = "https://aimentor-app.pages.dev"
+$workerUrl = "https://aimentor-app.pages.dev/"
 # read -hmac <secret> from command line (supports -hmac or --hmac)
 $hmacSecret = $null
 for ($i = 0; $i -lt $args.Count; $i++) {
