@@ -2,7 +2,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 
 import { Header } from "./components/Header";
-import { MentorPanel } from "./components/MentorPanel";   // ✅ named import
+import  MentorPanel from "./components/MentorPanel";
 import { LessonContent } from "./components/LessonContent"; // ✅ named import
 import { Footer } from "./components/Footer";
 
