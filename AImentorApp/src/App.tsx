@@ -1,75 +1,92 @@
-import React from 'react';
-import { Header } from './components/Header';
-import { MentorPanel } from './components/MentorPanel';
-import { LessonContent } from './components/LessonContent';
-import { Footer } from './components/Footer';
+import React, { useState, useEffect } from "react";
+import Header from "./components/Header";
+import LessonContent from "./components/LessonContent";
+import MentorPanel from "./components/MentorPanel";
+import Footer from "./components/Footer";
 
+function App() {
+  // 🔹 State for lesson data
+  const [lessonData, setLessonData] = useState<{
+    courseName: string;
+    lessonName: string;
+    sections: Array<{ title: string; content: string; type?: "text" | "code" | "tip" }>;
+  }>({
+    courseName: "Loading...",
+    lessonName: "Loading...",
+    sections: [
+      {
+        title: "Loading content...",
+        content: "<p>Loading content, please wait...</p>",
+        type: "text",
+      },
+    ],
+  });
 
-const [lessonData, setLessonData] = React.useState<{ courseName: string; lessonName: string; sections: Array<{title:string; content:string; type?: 'text'|'code'|'tip'}> }>({
-  courseName: "Learn Python Pandas",
-  lessonName: "Cross tabulations",
-  sections: [
-    {
-      title: "Overview",
-      content: "<p>Loading content...</p>",
-      type: "text",
-    },
-  ],
-});
+  // 🔹 Load lesson data from Worker when app starts
+  useEffect(() => {
+    async function loadLesson() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const data = params.get("data");
+        const sig = params.get("sig");
 
-React.useEffect(() => {
-  async function loadLesson() {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const data = params.get("data");
-      const sig = params.get("sig");
-      if (!data || !sig) return;
-      const res = await fetch(
-        `https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/lesson?data=${encodeURIComponent(data)}&sig=${encodeURIComponent(sig)}`
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        console.error("Lesson load error:", json);
-        return;
+        if (!data || !sig) {
+          console.warn("Missing parameters in URL.");
+          return;
+        }
+
+        const res = await fetch(
+          `https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/lesson?data=${encodeURIComponent(
+            data
+          )}&sig=${encodeURIComponent(sig)}`
+        );
+
+        const json = await res.json();
+        if (!res.ok) {
+          console.error("Lesson load error:", json);
+          return;
+        }
+
+        const mapped = {
+          courseName: json.coursename || json.courseName || "Unknown Course",
+          lessonName: json.lessonname || json.lessonName || "Untitled Lesson",
+          sections: [
+            {
+              title: "Lesson",
+              content: String(json.content || "<p>No content available.</p>"),
+              type: "text" as const,
+            },
+          ],
+        };
+
+        setLessonData(mapped);
+      } catch (e) {
+        console.error("Failed to fetch lesson:", e);
       }
-      const mapped = {
-        courseName: json.coursename || json.courseName || "Course",
-        lessonName: json.lessonname || json.lessonName || "Lesson",
-        sections: [
-          {
-            title: "Lesson",
-            content: String(json.content || ""),
-            type: "text" as const,
-          },
-        ],
-      };
-      setLessonData(mapped);
-    } catch (e) {
-      console.error("Failed to fetch lesson:", e);
     }
-  }
-  loadLesson();
-}, []);
 
+    loadLesson();
+  }, []);
 
-export default function App() {
   return (
-    <div className="flex flex-col min-h-screen bg-[#F6F6F6]">
+    <div className="min-h-screen bg-[#F6F6F6] flex flex-col">
+      {/* Header */}
       <Header courseName={lessonData.courseName} />
-      
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Mentor Panel - 2 columns on large screens */}
+
+      {/* Main content */}
+      <main className="flex-1 container mx-auto px-4 md:px-8 py-10">
+        <div className="grid lg:grid-cols-5 gap-8">
+          {/* Left side - Mentor Panel */}
           <div className="lg:col-span-2 order-1">
             <div className="lg:sticky lg:top-24">
               <MentorPanel mentorName="Anna" />
             </div>
           </div>
-          
-          {/* Lesson Content - 3 columns on large screens */}
+
+          {/* Right side - Lesson Content */}
           <div className="lg:col-span-3 order-2">
             <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-6 md:p-8">
-              <LessonContent 
+              <LessonContent
                 lessonName={lessonData.lessonName}
                 sections={lessonData.sections}
               />
@@ -77,8 +94,11 @@ export default function App() {
           </div>
         </div>
       </main>
-      
+
+      {/* Footer */}
       <Footer />
     </div>
   );
 }
+
+export default App;
