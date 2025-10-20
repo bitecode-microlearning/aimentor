@@ -20,7 +20,7 @@ $lesson = @{
     coursename     = "Python101"
     lessonname     = "Loops"
     userfirstname  = "Luca"
-    content        = "Intro to loops in Python"
+    content        = "<p>Intro to loops in Python</p><ul><li>for loops</li><li>while loops</li></ul></p>"
     knowledgelevel = "beginner"
     timestamp      = [int][double]::Parse((Get-Date -UFormat %s))  # epoch seconds
 }
