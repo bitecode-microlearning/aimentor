@@ -55,36 +55,35 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       console.log("🔐 Signed URL received:", signedUrl);
 
       // --- 2️⃣ Start the ElevenLabs conversation session
-      const convo = await Conversation.startSession({
-        signedUrl,
-        connectionType: "websocket",
+    const convo = await Conversation.startSession({
+      signedUrl,
+      connectionType: "websocket",
 
-        // 🔹 Dynamic variables are injected here
-        conversationConfig: {
-          dynamic_variables: {
-            userfirstname: userfirstname || "User",
-            coursename: coursename || "Unknown Course",
-            lessonname: lessonname || "Untitled Lesson",
-            knowledgelevel: knowledgelevel || "beginner",
-            content: content || "",
-          },
+      // ✅ Correct structure for dynamic variables (per ElevenLabs spec)
+      conversationConfigOverrides: {
+        dynamicVariables: {
+          userfirstname: userfirstname || "User",
+          coursename: coursename || "Unknown Course",
+          lessonname: lessonname || "Untitled Lesson",
+          knowledgelevel: knowledgelevel || "beginner",
+          content: content || "",
         },
+      },
 
-        // --- 3️⃣ Event handlers
-        clientTools: {
-          logMessage: async ({ message }) =>
-            setMessages((prev) => [...prev, { role: "ai", text: message }]),
+      clientTools: {
+        logMessage: async ({ message }) =>
+          setMessages((prev) => [...prev, { role: "ai", text: message }]),
 
-          onUserMessage: async ({ message }) =>
-            setMessages((prev) => [...prev, { role: "user", text: message }]),
+        onUserMessage: async ({ message }) =>
+          setMessages((prev) => [...prev, { role: "user", text: message }]),
 
-          onEnd: async () =>
-            setMessages((prev) => [
-              ...prev,
-              { role: "ai", text: "✅ Conversation ended." },
-            ]),
-        },
-      });
+        onEnd: async () =>
+          setMessages((prev) => [
+            ...prev,
+            { role: "ai", text: "✅ Conversation ended." },
+          ]),
+      },
+    });
 
       // --- 4️⃣ Keep reference for later user messages
       setConversationRef(convo);
