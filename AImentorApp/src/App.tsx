@@ -1,10 +1,10 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 
-import Header from "./components/Header";
-import LessonContent from "./components/LessonContent";
-import MentorPanel from "./components/MentorPanel";
-import Footer from "./components/Footer";
+import { Header } from "./components/Header";
+import { MentorPanel } from "./components/MentorPanel";   // ✅ named import
+import { LessonContent } from "./components/LessonContent"; // ✅ named import
+import { Footer } from "./components/Footer";
 
 function App() {
   // 🔹 State for lesson data
