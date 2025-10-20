@@ -29,9 +29,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const WORKER_AGENT_URL =
     "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/agent";
 
-  /** --------------------------------------------------------------
-   *  Handle starting a new AI mentor session
-   *  -------------------------------------------------------------- */
+  /** ------------------------------------------------------------------
+   * Handle starting a new AI mentor session
+   * ------------------------------------------------------------------ */
   const handleStartConversation = async () => {
     try {
       setIsListening(true);
@@ -45,7 +45,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       if (!res.ok || !data.signed_url) {
         setMessages((prev) => [
           ...prev,
-          { role: "ai", text: "⚠️ Unable to get a signed session. Try again later." },
+          {
+            role: "ai",
+            text: "⚠️ Unable to get a signed session. Try again later.",
+          },
         ]);
         setIsListening(false);
         return;
@@ -54,41 +57,53 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       const signedUrl = data.signed_url;
       console.log("🔐 Signed URL received:", signedUrl);
 
-      // --- 2️⃣ Start the ElevenLabs conversation session
-    const convo = await Conversation.startSession({
-      signedUrl,
-      connectionType: "websocket",
+      // --- 2️⃣ Start the ElevenLabs conversation session (no dynamic vars yet)
+      const convo = await Conversation.startSession({
+        signedUrl,
+        connectionType: "websocket",
+        clientTools: {
+          logMessage: async ({ message }) =>
+            setMessages((prev) => [...prev, { role: "ai", text: message }]),
 
-      // ✅ Correct structure for dynamic variables (per ElevenLabs spec)
-      conversationConfigOverrides: {
-        dynamicVariables: {
+          onUserMessage: async ({ message }) =>
+            setMessages((prev) => [...prev, { role: "user", text: message }]),
+
+          onEnd: async () =>
+            setMessages((prev) => [
+              ...prev,
+              { role: "ai", text: "✅ Conversation ended." },
+            ]),
+        },
+      });
+
+      // --- 3️⃣ Store reference for later
+      setConversationRef(convo);
+      setIsListening(false);
+      setIsSpeaking(true);
+
+      // --- 4️⃣ Send initial dynamic variables as first message
+      const initPayload = {
+        system_prompt: "Initialize dynamic variables for this mentoring session.",
+        dynamic_variables: {
           userfirstname: userfirstname || "User",
           coursename: coursename || "Unknown Course",
           lessonname: lessonname || "Untitled Lesson",
           knowledgelevel: knowledgelevel || "beginner",
           content: content || "",
         },
-      },
+      };
 
-      clientTools: {
-        logMessage: async ({ message }) =>
-          setMessages((prev) => [...prev, { role: "ai", text: message }]),
+      console.log("📡 Sending initial dynamic variables:", initPayload);
 
-        onUserMessage: async ({ message }) =>
-          setMessages((prev) => [...prev, { role: "user", text: message }]),
+      await convo.sendUserMessage(JSON.stringify(initPayload));
 
-        onEnd: async () =>
-          setMessages((prev) => [
-            ...prev,
-            { role: "ai", text: "✅ Conversation ended." },
-          ]),
-      },
-    });
-
-      // --- 4️⃣ Keep reference for later user messages
-      setConversationRef(convo);
-      setIsListening(false);
-      setIsSpeaking(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "system",
+          text: "📡 Sent initial lesson context to mentor.",
+        },
+      ]);
     } catch (err) {
       console.error("❌ Conversation start error:", err);
       setMessages((prev) => [
@@ -99,9 +114,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  /** --------------------------------------------------------------
-   *  Handle sending a follow-up question during active session
-   *  -------------------------------------------------------------- */
+  /** ------------------------------------------------------------------
+   * Handle sending a follow-up question during an active session
+   * ------------------------------------------------------------------ */
   const handleAskQuestion = async () => {
     if (!conversationRef) {
       setMessages((prev) => [
@@ -127,9 +142,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  /** --------------------------------------------------------------
-   *  Handle ending the current conversation manually
-   *  -------------------------------------------------------------- */
+  /** ------------------------------------------------------------------
+   * Handle ending the current conversation manually
+   * ------------------------------------------------------------------ */
   const handleEndConversation = async () => {
     try {
       if (conversationRef && conversationRef.endSession) {
@@ -157,6 +172,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           Start an interactive conversation with your mentor.
         </p>
 
+        {/* --- Control buttons --- */}
         <div className="flex flex-col items-center gap-2">
           <button
             onClick={handleStartConversation}
