@@ -6,7 +6,6 @@ export default defineConfig({
   plugins: [
     react({
       jsxImportSource: "react",
-      plugins: [["@swc/plugin-transform-react-jsx", { runtime: "automatic" }]],
     }),
   ],
   resolve: {
