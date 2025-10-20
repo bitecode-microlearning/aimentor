@@ -1,5 +1,5 @@
 # ==== CONFIG ====
-$workerUrl = "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/lesson"
+$workerUrl = "https://aimentor-app.pages.dev"
 # read -hmac <secret> from command line (supports -hmac or --hmac)
 $hmacSecret = $null
 for ($i = 0; $i -lt $args.Count; $i++) {
@@ -47,8 +47,8 @@ $sig = -join ($hashBytes | ForEach-Object { $_.ToString("x2") })
 
 # ==== 5. Build URL and test ====
 $url = "$($workerUrl)?data=$([Uri]::EscapeDataString($encoded))&sig=$sig"
-Write-Host "`n➡️  Testing worker URL:`n$url`n"
+Write-Host "URL created for testing:`n$url`n"
 
-$response = Invoke-RestMethod -Uri $url -Method GET -ErrorAction Stop
-Write-Host "✅ Worker response:"
-$response | ConvertTo-Json -Depth 5
+#$response = Invoke-RestMethod -Uri $url -Method GET -ErrorAction Stop
+#Write-Host "✅ Worker response:"
+#$response | ConvertTo-Json -Depth 5

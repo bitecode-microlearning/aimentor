@@ -3,7 +3,10 @@ export default {
     const url = new URL(request.url);
     const { pathname, searchParams } = url;
 
-    const allowedOrigins = ["https://aimentor.pages.dev"];
+    const allowedOrigins = [
+      "https://aimentor.pages.dev",
+      "https://aimentor-app.pages.dev",
+    ];
     const origin = request.headers.get("Origin");
     const referer = request.headers.get("Referer");
 
