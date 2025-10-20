@@ -59,15 +59,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       // --- 2️⃣ Start the ElevenLabs conversation session (no dynamic vars yet)
       const convo = await Conversation.startSession({
-        signedUrl,
-        connectionType: "websocket",
+        signedUrl,                      // ✅ or agentId: 'agent_xxx'
+        connectionType: "websocket",    // Required for real-time
+        dynamicVariables: {
+          userfirstname: userfirstname || "User",
+          coursename: coursename || "Unknown Course",
+          lessonname: lessonname || "Untitled Lesson",
+          knowledgelevel: knowledgelevel || "beginner",
+          content: content || "",
+        },
         clientTools: {
           logMessage: async ({ message }) =>
             setMessages((prev) => [...prev, { role: "ai", text: message }]),
-
           onUserMessage: async ({ message }) =>
             setMessages((prev) => [...prev, { role: "user", text: message }]),
-
           onEnd: async () =>
             setMessages((prev) => [
               ...prev,
@@ -75,6 +80,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             ]),
         },
       });
+
 
       // --- 3️⃣ Store reference for later
       setConversationRef(convo);
