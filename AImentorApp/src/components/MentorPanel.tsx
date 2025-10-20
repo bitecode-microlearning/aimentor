@@ -1,162 +1,80 @@
-import React, { useState } from 'react';
-import { Mic, MicOff, MessageSquare, Volume2, VolumeX } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
+import React, { useState } from "react";
+import { Conversation } from "@elevenlabs/client";
+
+const WORKER_URL =
+  "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/agent";
 
 interface MentorPanelProps {
-  mentorName?: string;
-  mentorImage?: string;
+  userName: string;
 }
 
-export function MentorPanel({ 
-  mentorName = "Anna", 
-  mentorImage = "https://images.unsplash.com/photo-1511629091441-ee46146481b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0ZWFjaGVyJTIwbWVudG9yJTIwYWl8ZW58MXx8fHwxNzYwODc0NzgxfDA&ixlib=rb-4.1.0&q=80&w=1080"
-}: MentorPanelProps) {
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'ai'; text: string }>>([]);
-  const [showChat, setShowChat] = useState(false);
+const MentorPanel: React.FC<MentorPanelProps> = ({ userName }) => {
+  const [isCalling, setIsCalling] = useState(false);
+  const [log, setLog] = useState<string[]>([]);
 
-  const handleStartConversation = () => {
-    setIsListening(true);
-    setShowChat(true);
-    
-    // Simulate AI response
-    setTimeout(() => {
-      setIsListening(false);
-      setIsSpeaking(true);
-      setMessages([{ 
-        role: 'ai', 
-        text: `Hi! I'm ${mentorName}, your AI mentor. I'm here to help you with this lesson. Feel free to ask me any questions!` 
-      }]);
-      
-      setTimeout(() => {
-        setIsSpeaking(false);
-      }, 3000);
-    }, 2000);
-  };
+  function addMsg(sender: string, msg: string) {
+    setLog((prev) => [...prev, `${sender}: ${msg}`]);
+  }
 
-  const handleAskQuestion = () => {
-    if (!isListening && !isSpeaking) {
-      setIsListening(true);
-      
-      setTimeout(() => {
-        setIsListening(false);
-        const userQuestion = "Can you explain this concept in more detail?";
-        setMessages(prev => [...prev, { role: 'user', text: userQuestion }]);
-        
-        setTimeout(() => {
-          setIsSpeaking(true);
-          setMessages(prev => [...prev, { 
-            role: 'ai', 
-            text: "Of course! Let me break this down for you step by step. This concept is fundamental to understanding how the system works..." 
-          }]);
-          
-          setTimeout(() => {
-            setIsSpeaking(false);
-          }, 4000);
-        }, 1000);
-      }, 2000);
+  async function startMentor() {
+    try {
+      setIsCalling(true);
+      addMsg("System", "Calling your AI mentor...");
+
+      const res = await fetch(WORKER_URL);
+      const data = await res.json();
+
+      if (!data.signed_url) {
+        addMsg("⚠️", "Worker did not return a signed_url.");
+        console.error("Worker response:", data);
+        setIsCalling(false);
+        return;
+      }
+
+      const signedUrl = data.signed_url;
+      console.log("🔐 Signed URL received:", signedUrl);
+
+      const conversation = await Conversation.startSession({
+        signedUrl,
+        connectionType: "websocket",
+        clientTools: {
+          logMessage: async ({ message }) => addMsg("🤖", message),
+          onUserMessage: async ({ message }) => addMsg("👤", message),
+          onEnd: async () => addMsg("✅", "Conversation ended."),
+        },
+      });
+
+      addMsg("System", "Connected to ElevenLabs successfully.");
+
+      const convId =
+        conversation?.conversationId ||
+        conversation?.id ||
+        conversation?.state?.conversationId;
+      if (convId) console.log("🧠 Conversation ID:", convId);
+
+      await conversation.sendUserMessage(
+        `Hi ${userName}, let's start the mentoring session.`
+      );
+    } catch (err) {
+      console.error("❌ Error starting conversation:", err);
+      addMsg("❌", "Unexpected error occurred. See console for details.");
+    } finally {
+      setIsCalling(false);
     }
-  };
+  }
 
   return (
-    <div className="relative h-full min-h-[500px] lg:min-h-[600px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100">
-      {/* Mentor Image */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ 
-          backgroundImage: `url(${mentorImage})`,
-          filter: isListening || isSpeaking ? 'brightness(0.7)' : 'brightness(1)',
-          transition: 'filter 0.3s ease'
-        }}
-      />
-      
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-      
-      {/* Status Indicator */}
-      {(isListening || isSpeaking) && (
-        <div className="absolute top-4 left-4 right-4 z-10">
-          <Card className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg border-0">
-            <div className="flex items-center gap-3">
-              {isListening && (
-                <>
-                  <div className="flex gap-1">
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-[#1376C8]">Listening...</span>
-                </>
-              )}
-              {isSpeaking && (
-                <>
-                  <Volume2 className="text-[#00CE8D] animate-pulse" size={24} />
-                  <span className="text-[#00CE8D]">{mentorName} is speaking...</span>
-                </>
-              )}
-            </div>
-          </Card>
-        </div>
-      )}
-      
-      {/* Chat Messages */}
-      {showChat && messages.length > 0 && (
-        <div className="absolute top-20 left-4 right-4 z-10 max-h-[calc(100%-180px)] overflow-y-auto space-y-2">
-          {messages.map((msg, idx) => (
-            <Card 
-              key={idx} 
-              className={`p-3 shadow-lg border-0 max-w-[85%] ${
-                msg.role === 'ai' 
-                  ? 'bg-white/95 backdrop-blur-sm ml-0' 
-                  : 'bg-[#1376C8]/95 text-white ml-auto'
-              }`}
-            >
-              <p className="m-0 text-sm">{msg.text}</p>
-            </Card>
-          ))}
-        </div>
-      )}
-      
-      {/* Control Buttons */}
-      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-        {!showChat ? (
-          <Button
-            onClick={handleStartConversation}
-            size="lg"
-            className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full w-16 h-16 p-0"
-          >
-            <MessageSquare size={28} />
-          </Button>
-        ) : (
-          <>
-            <Button
-              onClick={handleAskQuestion}
-              disabled={isListening || isSpeaking}
-              size="lg"
-              className="bg-[#1376C8] hover:bg-[#0f5fa4] text-white shadow-2xl rounded-full w-16 h-16 p-0 disabled:opacity-50"
-            >
-              {isListening ? <MicOff size={28} /> : <Mic size={28} />}
-            </Button>
-            <Button
-              onClick={() => setShowChat(!showChat)}
-              size="lg"
-              variant="secondary"
-              className="bg-white/90 hover:bg-white text-[#1376C8] shadow-xl rounded-full w-16 h-16 p-0"
-            >
-              {isSpeaking ? <VolumeX size={28} /> : <Volume2 size={28} />}
-            </Button>
-          </>
-        )}
-      </div>
-      
-      {/* Mentor Name Badge */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <Card className="bg-white/95 backdrop-blur-sm px-4 py-2 shadow-lg border-0">
-          <p className="m-0 text-[#1376C8]">AI Mentor: {mentorName}</p>
-        </Card>
+    <div className="mentor-panel">
+      <button onClick={startMentor} disabled={isCalling}>
+        {isCalling ? "Calling your AI mentor..." : "Call your AI mentor"}
+      </button>
+      <div id="chatLog" className="chat-log">
+        {log.map((msg, i) => (
+          <div key={i}>{msg}</div>
+        ))}
       </div>
     </div>
   );
-}
+};
+
+export default MentorPanel;
