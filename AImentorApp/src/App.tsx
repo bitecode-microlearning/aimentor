@@ -50,8 +50,12 @@ function App() {
         }
 
         const mapped = {
-          courseName: json.coursename || json.courseName || "Unknown Course",
-          lessonName: json.lessonname || json.lessonName || "Untitled Lesson",
+          courseName: json.coursename || "Unknown Course",
+          lessonName: json.lessonname || "Untitled Lesson",
+          userfirstname: json.userfirstname || "Unknown User",
+          knowledgelevel: json.knowledgelevel || "Beginner",
+          content: json.content || "<p>No content available.</p>",
+
           sections: [
             {
               title: "Lesson",
@@ -81,7 +85,13 @@ function App() {
           {/* Left side - Mentor Panel */}
           <div className="lg:col-span-2 order-1">
             <div className="lg:sticky lg:top-24">
-              <MentorPanel mentorName="Anna" />
+              <MentorPanel 
+                userfirstname={lessonData.userfirstname}
+                coursename={lessonData.courseName}
+                lessonname={lessonData.lessonName}
+                content={lessonData.content}
+                knowledgelevel={lessonData.knowledgelevel}
+              />
             </div>
           </div>
 
@@ -89,7 +99,6 @@ function App() {
           <div className="lg:col-span-3 order-2">
             <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-6 md:p-8">
               <LessonContent
-                lessonName={lessonData.lessonName}
                 sections={lessonData.sections}
               />
             </div>
