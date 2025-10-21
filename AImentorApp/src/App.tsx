@@ -23,6 +23,7 @@ function App() {
       },
     ],
   });
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // 🔹 Load lesson data from Worker when app starts
   useEffect(() => {
@@ -34,6 +35,7 @@ function App() {
 
         if (!data || !sig) {
           console.warn("Missing parameters in URL.");
+          setLoadError("Missing parameters in URL.");
           return;
         }
 
@@ -46,6 +48,7 @@ function App() {
         const json = await res.json();
         if (!res.ok) {
           console.error("Lesson load error:", json);
+          setLoadError("Lesson load error");
           return;
         }
 
@@ -68,6 +71,7 @@ function App() {
         setLessonData(mapped);
       } catch (e) {
         console.error("Failed to fetch lesson:", e);
+        setLoadError("Failed to fetch lesson");
       }
     }
 
@@ -75,40 +79,51 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] flex flex-col">
-      {/* Header */}
-      <Header courseName={lessonData.courseName} />
-
-      {/* Main content */}
-      <main className="flex-1 container mx-auto px-4 md:px-8 py-10">
-        <div className="grid lg:grid-cols-5 gap-8">
-          {/* Left side - Mentor Panel */}
-          <div className="lg:col-span-2 order-1">
-            <div className="lg:sticky lg:top-24">
-              <MentorPanel 
-                userfirstname={lessonData.userfirstname}
-                coursename={lessonData.courseName}
-                lessonname={lessonData.lessonName}
-                content={lessonData.content}
-                knowledgelevel={lessonData.knowledgelevel}
-              />
-            </div>
-          </div>
-
-          {/* Right side - Lesson Content */}
-          <div className="lg:col-span-3 order-2">
-            <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-6 md:p-8">
-              <LessonContent
-                sections={lessonData.sections}
-              />
-            </div>
-          </div>
+    // If there's a load error, show a minimal error message only
+    loadError ? (
+      <div className="min-h-screen flex items-center justify-center bg-[#F6F6F6]">
+        <div className="text-center p-6 bg-white rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-2">Lesson load error</h2>
+          <p className="text-sm text-muted-foreground">{loadError}</p>
         </div>
-      </main>
+      </div>
+    ) : (
+      <div className="min-h-screen bg-[#F6F6F6] flex flex-col">
+        {/* Header */}
+        <Header courseName={lessonData.courseName} />
 
-      {/* Footer */}
-      <Footer />
-    </div>
+        {/* Main content */}
+        <main className="flex-1 container mx-auto px-4 md:px-8 py-10">
+          <div className="grid lg:grid-cols-5 gap-8">
+            {/* Left side - Mentor Panel */}
+            <div className="lg:col-span-2 order-1">
+              <div className="lg:sticky lg:top-24">
+                <MentorPanel 
+                  userfirstname={lessonData.userfirstname}
+                  coursename={lessonData.courseName}
+                  lessonname={lessonData.lessonName}
+                  content={lessonData.content}
+                  knowledgelevel={lessonData.knowledgelevel}
+                />
+              </div>
+            </div>
+
+            {/* Right side - Lesson Content */}
+            <div className="lg:col-span-3 order-2">
+              <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-6 md:p-8">
+                <LessonContent
+                  lessonName={lessonData.lessonName}
+                  sections={lessonData.sections}
+                />
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <Footer />
+      </div>
+    )
   );
 }
 
