@@ -6,6 +6,17 @@ interface HeaderProps {
 }
 
 export function Header({ courseName }: HeaderProps) {
+  const [isLarge, setIsLarge] = React.useState<boolean>(true);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsLarge(mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
+
   return (
     <header className="w-full bg-[#1376C8] text-white shadow-lg sticky top-0 z-50">
       <div className="w-full max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-4">
@@ -20,33 +31,34 @@ export function Header({ courseName }: HeaderProps) {
         </div>
 
         <nav className="flex items-center gap-4">
-          {/* Desktop nav - hidden on small screens, visible from lg and up */}
-          <div className="hidden lg:flex items-center gap-4">
-            <a 
-              href="https://bitecode.co" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Home size={18} />
-              <span>Home</span>
-            </a>
-            <a 
-              href="https://buymeacoffee.com/bitecode" 
-              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Heart size={18} />
-              <span className="hidden sm:inline">Give back to learn more!</span>
-              <span className="inline sm:hidden">Support</span>
-            </a>
-          </div>
-
-          {/* Mobile-only hamburger (does not remove or replace desktop menu) */}
-          <div className="lg:hidden relative">
-            <MobileNavLinks />
-          </div>
+          {/* Render desktop or mobile UI depending on screen size (JS fallback) */}
+          {isLarge ? (
+            <div className="flex items-center gap-4">
+              <a 
+                href="https://bitecode.co" 
+                className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Home size={18} />
+                <span>Home</span>
+              </a>
+              <a 
+                href="https://buymeacoffee.com/bitecode" 
+                className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Heart size={18} />
+                <span className="hidden sm:inline">Give back to learn more!</span>
+                <span className="inline sm:hidden">Support</span>
+              </a>
+            </div>
+          ) : (
+            <div className="relative">
+              <MobileNavLinks />
+            </div>
+          )}
         </nav>
       </div>
     </header>
