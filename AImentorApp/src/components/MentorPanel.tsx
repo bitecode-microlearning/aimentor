@@ -122,6 +122,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  // Resolve image src (some bundlers return a module object with `default`)
+  const mentorPhotoSrc = ((mentorPhoto as any)?.default as string) || (mentorPhoto as string);
+
   /** ------------------------------------------------------------------
    * Send a follow-up question during an active session
    * ------------------------------------------------------------------ */
@@ -158,14 +161,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
       {/* Mentor Image: on mobile show top 2/3 (cropped bottom); on desktop show full image */}
-      <div className="absolute left-0 right-0 top-0 overflow-hidden lg:overflow-visible">
-        {/* mobile: height = 66% of container; lg: height = full container */}
-        <div
-          className="w-full h-[66%] lg:h-full bg-no-repeat bg-top lg:bg-center bg-cover lg:bg-contain"
+      <div className="absolute left-0 right-0 top-0 h-[66%] lg:h-full overflow-hidden">
+        {/* Use an <img> for reliable loading and object-position control */}
+        <img
+          src={mentorPhotoSrc}
+          alt="Mentor"
+          className="w-full h-full object-top object-cover lg:object-contain lg:object-center"
           style={{
-            backgroundImage: `url(${mentorPhoto})`,
             filter: conversationState === "listening" || conversationState === "speaking" ? "brightness(0.7)" : "brightness(1)",
             transition: "filter 0.3s ease",
+          }}
+          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            console.error("Mentor image failed to load:", (e.target as HTMLImageElement).src);
+            // Don't set configError here; showing a config overlay hides the mentor UI entirely.
+            // Keep the failure logged so you can inspect the network/console in the browser.
           }}
         />
       </div>
