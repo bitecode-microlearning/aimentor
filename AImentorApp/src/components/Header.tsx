@@ -18,9 +18,9 @@ export function Header({ courseName }: HeaderProps) {
             <h2 className="m-0 text-sm opacity-80">AI Mentoring Lesson</h2>
           </div>
         </div>
-        
+
         <nav className="flex items-center gap-4">
-          {/* Desktop nav - shown on lg and up */}
+          {/* Desktop nav - hidden on small screens, visible from lg and up */}
           <div className="hidden lg:flex items-center gap-4">
             <a 
               href="https://bitecode.co" 
@@ -43,7 +43,7 @@ export function Header({ courseName }: HeaderProps) {
             </a>
           </div>
 
-          {/* Mobile: hamburger to toggle same links */}
+          {/* Mobile-only hamburger (does not remove or replace desktop menu) */}
           <div className="lg:hidden relative">
             <MobileNavLinks />
           </div>
