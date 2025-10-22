@@ -8,45 +8,17 @@ import { cn } from "./utils";
 
 function Menubar({
   className,
-  children,
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Root>) {
   return (
-    <>
-      {/* Desktop / large screens: show the existing menubar */}
-      <MenubarPrimitive.Root
-        data-slot="menubar"
-        className={cn(
-          // hide on small screens, show from lg and up
-          "hidden lg:flex bg-background h-9 items-center gap-1 rounded-md border p-1 shadow-xs",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </MenubarPrimitive.Root>
-
-      {/* Mobile: compact hamburger that opens a Radix menubar content */}
-      <MenubarPrimitive.Root
-        data-slot="menubar-mobile"
-        className={cn("flex lg:hidden items-center", className)}
-      >
-        <MenubarPrimitive.Trigger
-          data-slot="menubar-mobile-trigger"
-          className="inline-flex items-center justify-center p-2 rounded-md bg-background border"
-        >
-          <span className="block w-5">
-            <span className="block h-0.5 bg-current rounded-sm my-1" />
-            <span className="block h-0.5 bg-current rounded-sm my-1" />
-            <span className="block h-0.5 bg-current rounded-sm my-1" />
-          </span>
-        </MenubarPrimitive.Trigger>
-
-        <MenubarPrimitive.Content className="left-0 mt-2 w-64 bg-popover text-popover-foreground rounded-md border shadow-lg z-50">
-          <div className="p-2">{children}</div>
-        </MenubarPrimitive.Content>
-      </MenubarPrimitive.Root>
-    </>
+    <MenubarPrimitive.Root
+      data-slot="menubar"
+      className={cn(
+        "bg-background flex h-9 items-center gap-1 rounded-md border p-1 shadow-xs",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
