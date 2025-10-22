@@ -87,7 +87,7 @@ function MobileNavLinks() {
 function MobileHamburgerLeft() {
   const [open, setOpen] = React.useState(false);
   return (
-    <div className="lg:hidden fixed left-4 top-4 z-[9999]">
+    <div className="lg:hidden relative">
       <button
         aria-label="Open menu"
         aria-expanded={open}
@@ -102,7 +102,7 @@ function MobileHamburgerLeft() {
       </button>
 
       {open && (
-        <div className="fixed left-4 top-16 w-56 bg-white text-black rounded-md p-3 shadow-lg z-[9999]">
+        <div className="absolute left-0 mt-12 w-56 bg-white text-black rounded-md p-3 shadow-lg z-50">
           <a href="https://bitecode.co" className="flex items-center gap-2 py-2">Home</a>
           <a href="https://buymeacoffee.com/bitecode" className="flex items-center gap-2 py-2">Support</a>
         </div>
