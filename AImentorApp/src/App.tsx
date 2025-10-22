@@ -39,11 +39,25 @@ function App() {
           return;
         }
 
-        const res = await fetch(
-          `https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/lesson?data=${encodeURIComponent(
-            data
-          )}&sig=${encodeURIComponent(sig)}`
-        );
+        // Load LESSON_AGENT_URL from config (required). If loading fails or value is empty,
+        // treat that as a lesson load error per requirement (do not use defaults).
+        let LESSON_AGENT_URL: string | undefined;
+        try {
+          const cfg = await import("./config/workerConfig");
+          LESSON_AGENT_URL = cfg?.LESSON_AGENT_URL;
+        } catch (cfgErr) {
+          console.error("Failed to load worker config:", cfgErr);
+          setLoadError("Lesson load error");
+          return;
+        }
+
+        if (!LESSON_AGENT_URL) {
+          console.error("Missing LESSON_AGENT_URL in src/config/workerConfig.ts");
+          setLoadError("Lesson load error");
+          return;
+        }
+
+        const res = await fetch(`${LESSON_AGENT_URL}?data=${encodeURIComponent(data)}&sig=${encodeURIComponent(sig)}`);
 
         const json = await res.json();
         if (!res.ok) {
@@ -93,8 +107,8 @@ function App() {
         <Header courseName={lessonData.courseName} />
 
         {/* Main content */}
-        <main className="flex-1 container mx-auto px-4 md:px-8 py-10">
-          <div className="grid lg:grid-cols-5 gap-8">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Left side - Mentor Panel */}
             <div className="lg:col-span-2 order-1">
               <div className="lg:sticky lg:top-24">
@@ -110,7 +124,7 @@ function App() {
 
             {/* Right side - Lesson Content */}
             <div className="lg:col-span-3 order-2">
-              <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-6 md:p-8">
+              <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-0 md:p-8">
                 <LessonContent
                   lessonName={lessonData.lessonName}
                   sections={lessonData.sections}

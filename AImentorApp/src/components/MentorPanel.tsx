@@ -28,15 +28,40 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
   const mentorName = "AI Mentor";
 
-  const WORKER_AGENT_URL =
-    "https://bitecode-aimentor-worker.cserenyecztibor.workers.dev/agent";
+  // Config error state: when present we show an error page instead of the Mentor UI.
+  const [configError, setConfigError] = useState<string | null>(null);
 
   /** ------------------------------------------------------------------
    * Start a new AI mentor session
    * ------------------------------------------------------------------ */
   const handleStartConversation = async () => {
     try {
-  setConversationState("listening");
+      // Dynamically import config and require WORKER_AGENT_URL to be present.
+      let WORKER_AGENT_URL: string | undefined;
+      try {
+        const cfg = await import("../config/agentConfig");
+        if (cfg && cfg.WORKER_AGENT_URL) {
+          WORKER_AGENT_URL = cfg.WORKER_AGENT_URL;
+        }
+      } catch (cfgErr) {
+        const errAny = cfgErr as any;
+        const msg = errAny?.message ?? String(cfgErr);
+        console.error("Failed to load agent config:", cfgErr);
+        setConfigError(`Failed to load agent config: ${msg}`);
+        setConversationState("idle");
+        return;
+      }
+
+      if (!WORKER_AGENT_URL) {
+        const message = "Missing WORKER_AGENT_URL in src/config/agentConfig.ts";
+        console.error(message);
+        setConfigError(message);
+        setConversationState("idle");
+        return;
+      }
+
+      // At this point the config is valid — switch to listening and continue.
+      setConversationState("listening");
 
       // --- 1️⃣ Request a signed session URL from the Cloudflare Worker
       const res = await fetch(WORKER_AGENT_URL);
@@ -121,15 +146,29 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
   return (
   <div className="relative h-full min-h-[500px] lg:min-h-[600px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100">
-      {/* Mentor Image */}
-      <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ 
-          backgroundImage: `url(${mentorPhoto})`,
-          filter: conversationState === 'listening' || conversationState === 'speaking' ? 'brightness(0.7)' : 'brightness(1)',
-          transition: 'filter 0.3s ease'
-        }}
-      />
+      {configError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white">
+          <Card className="max-w-lg mx-6 p-6 text-center">
+            <h3 className="text-lg font-semibold">Configuration error</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{configError}</p>
+            <div className="mt-4">
+              <Button onClick={() => setConfigError(null)}>Dismiss</Button>
+            </div>
+          </Card>
+        </div>
+      )}
+      {/* Mentor Image: on mobile show top 2/3 (cropped bottom); on desktop show full image */}
+      <div className="absolute left-0 right-0 top-0 overflow-hidden lg:overflow-visible">
+        {/* mobile: height = 66% of container; lg: height = full container */}
+        <div
+          className="w-full h-[66%] lg:h-full bg-no-repeat bg-top lg:bg-center bg-cover"
+          style={{
+            backgroundImage: `url(${mentorPhoto})`,
+            filter: conversationState === "listening" || conversationState === "speaking" ? "brightness(0.7)" : "brightness(1)",
+            transition: "filter 0.3s ease",
+          }}
+        />
+      </div>
       
       {/* Overlay gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -168,19 +207,24 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
       
-      {/* Chat removed - single-button flow */}
-      
-      {/* Control Buttons */}
-      <div className="absolute bottom-4 right-4 z-10">
-        <Button
-          onClick={conversationState === "idle" ? handleStartConversation : handleEndConversation}
-          disabled={conversationState === "listening" || conversationState === "thinking"}
-          size="lg"
-          className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full w-16 h-16 p-0 disabled:opacity-60"
-        >
-          {conversationState === "idle" ? <MessageSquare size={28} /> : <VolumeX size={28} />}
-        </Button>
-      </div>
+  {/* Chat removed - single-button flow */}
+          
+          {/* Control Buttons */}
+          <div className="absolute bottom-4 right-4 z-10">
+          <Button
+            onClick={conversationState === "idle" ? handleStartConversation : handleEndConversation}
+            disabled={conversationState === "listening" || conversationState === "thinking"}
+            size="lg"
+            className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full disabled:opacity-60"
+          >
+            <div className="flex items-center gap-3 px-4 py-2">
+            {conversationState === "idle" ? <MessageSquare size={20} /> : <VolumeX size={20} />}
+            <span className="font-medium">
+              {conversationState === "idle" ? "Start lesson.." : "End lesson"}
+            </span>
+            </div>
+          </Button>
+          </div>
       
     </div>
   );

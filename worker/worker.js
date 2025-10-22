@@ -113,7 +113,7 @@ export default {
           .join("");
 
         if (expectedSig !== signature) {
-          const errormsg = "Invalid signature, cur.sig: "+expectedSig+" expected: "+signature;
+          const errormsg = "Invalid signature, cur.sig: "+signature+" expected: "+expectedSig;
           return new Response(JSON.stringify({ error: errormsg }), {
             status: 403,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
