@@ -39,7 +39,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       // Dynamically import config and require WORKER_AGENT_URL to be present.
       let WORKER_AGENT_URL: string | undefined;
       try {
-        const cfg = await import("../config/agentConfig");
+        const cfg = await import("../config/workerConfig");
         if (cfg && cfg.WORKER_AGENT_URL) {
           WORKER_AGENT_URL = cfg.WORKER_AGENT_URL;
         }
