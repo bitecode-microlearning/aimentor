@@ -20,27 +20,62 @@ export function Header({ courseName }: HeaderProps) {
         </div>
         
         <nav className="flex items-center gap-4">
-          <a 
-            href="https://bitecode.co" 
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Home size={18} />
-            <span>Home</span>
-          </a>
-          <a 
-            href="https://buymeacoffee.com/bitecode" 
-            className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Heart size={18} />
-            <span className="hidden sm:inline">Give back to learn more!</span>
-            <span className="inline sm:hidden">Support</span>
-          </a>
+          {/* Desktop nav - shown on lg and up */}
+          <div className="hidden lg:flex items-center gap-4">
+            <a 
+              href="https://bitecode.co" 
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Home size={18} />
+              <span>Home</span>
+            </a>
+            <a 
+              href="https://buymeacoffee.com/bitecode" 
+              className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Heart size={18} />
+              <span className="hidden sm:inline">Give back to learn more!</span>
+              <span className="inline sm:hidden">Support</span>
+            </a>
+          </div>
+
+          {/* Mobile: hamburger to toggle same links */}
+          <div className="lg:hidden relative">
+            <MobileNavLinks />
+          </div>
         </nav>
       </div>
     </header>
+  );
+}
+
+function MobileNavLinks() {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <>
+      <button
+        aria-label="Open menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="p-2 rounded-md bg-white/10"
+      >
+        <span className="block w-5">
+          <span className="block h-0.5 bg-white rounded-sm my-1" />
+          <span className="block h-0.5 bg-white rounded-sm my-1" />
+          <span className="block h-0.5 bg-white rounded-sm my-1" />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute right-4 mt-12 w-56 bg-white text-black rounded-md p-3 shadow-lg">
+          <a href="https://bitecode.co" className="flex items-center gap-2 py-2">Home</a>
+          <a href="https://buymeacoffee.com/bitecode" className="flex items-center gap-2 py-2">Support</a>
+        </div>
+      )}
+    </>
   );
 }
