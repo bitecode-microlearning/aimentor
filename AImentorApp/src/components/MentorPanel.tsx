@@ -161,7 +161,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute left-0 right-0 top-0 overflow-hidden lg:overflow-visible">
         {/* mobile: height = 66% of container; lg: height = full container */}
         <div
-          className="w-full h-[66%] lg:h-full bg-no-repeat bg-top lg:bg-center bg-cover"
+          className="w-full h-[66%] lg:h-full bg-no-repeat bg-top lg:bg-center bg-cover lg:bg-contain"
           style={{
             backgroundImage: `url(${mentorPhoto})`,
             filter: conversationState === "listening" || conversationState === "speaking" ? "brightness(0.7)" : "brightness(1)",
