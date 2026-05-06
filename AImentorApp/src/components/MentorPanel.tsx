@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Conversation } from "@elevenlabs/client";
+import { useConversation } from "@elevenlabs/react";
 import mentorPhoto from "./img/AI_anna.gif";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -21,24 +21,27 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   knowledgelevel,
 }) => {
   // --- UI and conversation state variables
-  const [conversationRef, setConversationRef] = useState<any>(null);
   const [conversationState, setConversationState] = useState<
     "idle" | "listening" | "thinking" | "speaking"
   >("idle");
-  const [isMuted, setIsMuted] = useState<boolean>(true);
+
+  const { status, isSpeaking, startSession, endSession, micMuted, setMicMuted, conversationId, error } = useConversation();
 
   const mentorName = "AI Mentor";
 
+  // Derive conversationState from hook status
+  useEffect(() => {
+    if (status === "connected") {
+      setConversationState(isSpeaking ? "speaking" : "listening");
+    } else if (status === "connecting") {
+      setConversationState("thinking");
+    } else {
+      setConversationState("idle");
+    }
+  }, [status, isSpeaking]);
+
   // Config error state: when present we show an error page instead of the Mentor UI.
   const [configError, setConfigError] = useState<string | null>(null);
-
-  // Auto-mute when not in listening state
-  useEffect(() => {
-    if (conversationRef && conversationState !== "listening" && !isMuted) {
-      setIsMuted(true);
-      console.log("🔇 Auto-muted microphone");
-    }
-  }, [conversationState, conversationRef, isMuted]);
 
   /** ------------------------------------------------------------------
    * Start a new AI mentor session
@@ -57,7 +60,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         const msg = errAny?.message ?? String(cfgErr);
         console.error("Failed to load agent config:", cfgErr);
         setConfigError(`Failed to load agent config: ${msg}`);
-        setConversationState("idle");
         return;
       }
 
@@ -65,13 +67,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         const message = "Missing WORKER_AGENT_URL in src/config/agentConfig.ts";
         console.error(message);
         setConfigError(message);
-        setConversationState("idle");
         return;
       }
-
-      // At this point the config is valid — switch to listening and continue.
-      setConversationState("listening");
-      setIsMuted(true); // Start muted
 
       // --- 1️⃣ Request a signed session URL from the Cloudflare Worker
       const res = await fetch(WORKER_AGENT_URL);
@@ -79,7 +76,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       if (!res.ok || !data.signed_url) {
         console.warn("⚠️ Unable to get a signed session. Try again later.");
-        setConversationState("idle");
         return;
       }
 
@@ -89,10 +85,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       console.log("Sending initial parameters to Elevenlabs: ", userfirstname, coursename, lessonname, knowledgelevel, content);
 
       // --- 2️⃣ Start the ElevenLabs conversation session
-      //     (now correctly passing dynamicVariables directly)
-      const convo = await Conversation.startSession({
-        signedUrl,                     // or agentId if you prefer static mode
-        connectionType: "websocket",   // required for real-time
+      await startSession({
+        signedUrl,
         dynamicVariables: {
           userfirstname: userfirstname || "User",
           coursename: coursename || "Unknown Course",
@@ -103,9 +97,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         clientTools: {
           logMessage: async (payload: any) => {
             const message = payload?.message ?? payload;
-            // AI produced output — switch to speaking state
             console.log("AI ->", message);
-            setConversationState("speaking");
           },
 
           onUserMessage: async (payload: any) => {
@@ -115,20 +107,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
           onEnd: async () => {
             console.log("Conversation ended.");
-            setConversationState("idle");
           },
         },
       });
 
-      // --- 3️⃣ Store reference for later
-      // store session reference and mark as thinking while we wait for AI
-      setConversationRef(convo);
-      setConversationState("thinking");
       console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
     } catch (err) {
       console.error("❌ Conversation start error:", err);
       console.error("❌ Error starting conversation.");
-      setConversationState("idle");
     }
   };
 
@@ -145,16 +131,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * ------------------------------------------------------------------ */
   const handleEndConversation = async () => {
     try {
-      if (conversationRef && conversationRef.endSession) {
-        await conversationRef.endSession();
-        console.log("👋 Session closed by user.");
-      }
+      await endSession();
+      console.log("👋 Session closed by user.");
     } catch (e) {
       console.error("endSession error", e);
-    } finally {
-      setConversationRef(null);
-      setConversationState("idle");
-      setIsMuted(true);
     }
   };
 
@@ -162,10 +142,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * Toggle microphone mute state
    * ------------------------------------------------------------------ */
   const handleToggleMute = () => {
-    if (!conversationRef) return;
-
-    setIsMuted(!isMuted);
-    console.log(isMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
+    setMicMuted(!micMuted);
+    console.log(micMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
   };
 
   return (
@@ -204,11 +182,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       
       {/* Status Indicator (shows when not idle) */}
-      {conversationState !== "idle" && (
+      {status !== "disconnected" && (
         <div className="absolute top-4 left-4 right-4 z-10">
           <Card className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg border-0">
             <div className="flex items-center gap-3">
-              {conversationState === "listening" && (
+              {status === "connected" && !isSpeaking && (
                 <>
                   <div className="flex gap-1">
                     <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
@@ -216,19 +194,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
                     <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                   </div>
                   <span className="text-[#1376C8]">
-                    {isMuted ? "Waiting for you to unmute..." : "Listening..."}
+                    {micMuted ? "Waiting for you to unmute..." : "Listening..."}
                   </span>
                 </>
               )}
 
-              {conversationState === "thinking" && (
+              {status === "connecting" && (
                 <>
                   <div className="h-4 w-4 rounded-full border-2 border-[#F59E0B] animate-pulse" />
                   <span className="text-[#F59E0B]">Thinking...</span>
                 </>
               )}
 
-              {conversationState === "speaking" && (
+              {status === "connected" && isSpeaking && (
                 <>
                   <Volume2 className="text-[#00CE8D] animate-pulse" size={24} />
                   <span className="text-[#00CE8D]">{mentorName} is speaking...</span>
@@ -243,27 +221,27 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           
           {/* Control Buttons */}
           <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-            {conversationState !== "idle" && (
+            {status === "connected" && (
               <Button
                 onClick={handleToggleMute}
-                disabled={conversationState !== "listening"}
+                disabled={isSpeaking}
                 size="lg"
                 className={`rounded-full shadow-2xl disabled:opacity-60 ${
-                  isMuted 
+                  micMuted 
                     ? "bg-[#1376C8] hover:bg-[#0f5a99] text-white" 
                     : "bg-[#F59E0B] hover:bg-[#d97706] text-white"
                 }`}
               >
                 <div className="flex items-center gap-3 px-4 py-2">
-                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                  {micMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   <span className="font-medium">
-                    {isMuted ? "Unmute" : "Mute"}
+                    {micMuted ? "Unmute" : "Mute"}
                   </span>
                 </div>
               </Button>
             )}
 
-            {conversationState !== "idle" && isMuted && (
+            {status === "connected" && micMuted && (
               <Button
                 onClick={handleEndConversation}
                 size="lg"
@@ -276,10 +254,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               </Button>
             )}
 
-            {conversationState === "idle" && (
+            {status === "disconnected" && (
               <Button
                 onClick={handleStartConversation}
-                disabled={conversationState === "listening" || conversationState === "thinking"}
+                disabled={status === "connecting"}
                 size="lg"
                 className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full disabled:opacity-60"
               >
