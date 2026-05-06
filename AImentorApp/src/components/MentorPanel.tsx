@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useConversation } from "@elevenlabs/react";
+import React, { useState, useEffect, useRef } from "react";
+import { Conversation } from "@elevenlabs/client";
 import mentorPhoto from "./img/AI_anna.gif";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
@@ -24,28 +24,28 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [conversationState, setConversationState] = useState<
     "idle" | "listening" | "thinking" | "speaking"
   >("idle");
-
-  const { status, isSpeaking, startSession, endSession, micMuted, setMicMuted, conversationId, error } = useConversation();
-  const isListening = status === "connected" && !isSpeaking;
+  const [isMuted, setIsMuted] = useState(true);
+  const conversationRef = useRef<any>(null);
 
   const mentorName = "AI Mentor";
 
+  // Auto-mute when agent is speaking
   useEffect(() => {
-    if (!isListening && !micMuted) {
-      setMicMuted(true);
+    if (conversationState === "speaking") {
+      setIsMuted(true);
     }
-  }, [isListening, micMuted, setMicMuted]);
+  }, [conversationState]);
 
-  // Derive conversationState from hook status
+  // Auto-enable unmute after agent finishes speaking (with delay to allow for response processing)
   useEffect(() => {
-    if (status === "connected") {
-      setConversationState(isSpeaking ? "speaking" : "listening");
-    } else if (status === "connecting") {
-      setConversationState("thinking");
-    } else {
-      setConversationState("idle");
+    if (conversationState === "listening" && isMuted) {
+      // Small delay to ensure agent has fully stopped speaking
+      const timer = setTimeout(() => {
+        setIsMuted(false);
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [status, isSpeaking]);
+  }, [conversationState, isMuted]);
 
   // Config error state: when present we show an error page instead of the Mentor UI.
   const [configError, setConfigError] = useState<string | null>(null);
@@ -107,11 +107,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             const message = payload?.message ?? payload;
             console.log("AI ->", message);
             setConversationState("speaking");
+
+            // Auto-transition back to listening after a delay (estimate speaking duration)
+            // This is a heuristic - adjust the delay based on typical response lengths
+            setTimeout(() => {
+              if (conversationRef.current) {
+                setConversationState("listening");
+              }
+            }, 2000); // 2 second delay - adjust as needed
           },
 
           onUserMessage: async (payload: any) => {
             const message = payload?.message ?? payload;
             console.log("User ->", message);
+            setConversationState("thinking");
           },
 
           onEnd: async () => {
@@ -121,7 +130,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         },
       });
 
-      setConversationRef(convo);
+      conversationRef.current = convo;
       setConversationState("thinking");
       setIsMuted(true);
       console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
@@ -144,14 +153,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * ------------------------------------------------------------------ */
   const handleEndConversation = async () => {
     try {
-      if (conversationRef && conversationRef.endSession) {
-        await conversationRef.endSession();
+      if (conversationRef.current && conversationRef.current.endSession) {
+        await conversationRef.current.endSession();
         console.log("👋 Session closed by user.");
       }
     } catch (e) {
       console.error("endSession error", e);
     } finally {
-      setConversationRef(null);
+      conversationRef.current = null;
       setConversationState("idle");
       setIsMuted(true);
     }
@@ -161,7 +170,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * Toggle microphone mute state
    * ------------------------------------------------------------------ */
   const handleToggleMute = () => {
-    if (!conversationRef) return;
+    if (!conversationRef.current) return;
 
     setIsMuted(!isMuted);
     console.log(isMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
@@ -203,11 +212,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       
       {/* Status Indicator (shows when not idle) */}
-      {status !== "disconnected" && (
+      {conversationState !== "idle" && (
         <div className="absolute top-4 left-4 right-4 z-10">
           <Card className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg border-0">
             <div className="flex items-center gap-3">
-              {status === "connected" && !isSpeaking && (
+              {conversationState === "listening" && (
                 <>
                   <div className="flex gap-1">
                     <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
@@ -215,19 +224,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
                     <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
                   </div>
                   <span className="text-[#1376C8]">
-                    {micMuted ? "Waiting for you to unmute..." : "Listening..."}
+                    {isMuted ? "Waiting for you to unmute..." : "Listening..."}
                   </span>
                 </>
               )}
 
-              {status === "connecting" && (
+              {conversationState === "thinking" && (
                 <>
                   <div className="h-4 w-4 rounded-full border-2 border-[#F59E0B] animate-pulse" />
                   <span className="text-[#F59E0B]">Thinking...</span>
                 </>
               )}
 
-              {status === "connected" && isSpeaking && (
+              {conversationState === "speaking" && (
                 <>
                   <Volume2 className="text-[#00CE8D] animate-pulse" size={24} />
                   <span className="text-[#00CE8D]">{mentorName} is speaking...</span>
@@ -242,26 +251,26 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           
           {/* Control Buttons */}
           <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-            {isListening && (
+            {conversationState === "listening" && (
               <Button
                 onClick={handleToggleMute}
                 size="lg"
                 className={`rounded-full shadow-2xl disabled:opacity-60 ${
-                  micMuted 
-                    ? "bg-[#1376C8] hover:bg-[#0f5a99] text-white" 
+                  isMuted
+                    ? "bg-[#1376C8] hover:bg-[#0f5a99] text-white"
                     : "bg-[#F59E0B] hover:bg-[#d97706] text-white"
                 }`}
               >
                 <div className="flex items-center gap-3 px-4 py-2">
-                  {micMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                   <span className="font-medium">
-                    {micMuted ? "Unmute" : "Mute"}
+                    {isMuted ? "Unmute" : "Mute"}
                   </span>
                 </div>
               </Button>
             )}
 
-            {status === "connected" && micMuted && (
+            {conversationState !== "idle" && isMuted && (
               <Button
                 onClick={handleEndConversation}
                 size="lg"
@@ -274,10 +283,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               </Button>
             )}
 
-            {status === "disconnected" && (
+            {conversationState === "idle" && (
               <Button
                 onClick={handleStartConversation}
-                disabled={status === "connecting"}
+                disabled={conversationState === "thinking"}
                 size="lg"
                 className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full disabled:opacity-60"
               >
