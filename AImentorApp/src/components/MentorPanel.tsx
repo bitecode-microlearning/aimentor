@@ -26,6 +26,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   >("idle");
 
   const { status, isSpeaking, startSession, endSession, micMuted, setMicMuted, conversationId, error } = useConversation();
+  const isListening = status === "connected" && !isSpeaking;
 
   const mentorName = "AI Mentor";
 
@@ -221,10 +222,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           
           {/* Control Buttons */}
           <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-            {status === "connected" && (
+            {isListening && (
               <Button
                 onClick={handleToggleMute}
-                disabled={isSpeaking}
                 size="lg"
                 className={`rounded-full shadow-2xl disabled:opacity-60 ${
                   micMuted 
