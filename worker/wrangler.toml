@@ -1,3 +1,6 @@
 name = "bitecode-aimentor-worker"
 main = "worker.js"
 compatibility_date = "2025-10-19"
+
+[env.production]
+# Add production secrets in Cloudflare dashboard
