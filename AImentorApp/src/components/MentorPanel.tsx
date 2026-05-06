@@ -92,8 +92,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       console.log("Sending initial parameters to Elevenlabs: ", userfirstname, coursename, lessonname, knowledgelevel, content);
 
       // --- 2️⃣ Start the ElevenLabs conversation session
-      await startSession({
-        signedUrl,
+      const convo = await Conversation.startSession({
+        signedUrl,                     // or agentId if you prefer static mode
+        connectionType: "websocket",   // required for real-time
         dynamicVariables: {
           userfirstname: userfirstname || "User",
           coursename: coursename || "Unknown Course",
@@ -105,6 +106,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           logMessage: async (payload: any) => {
             const message = payload?.message ?? payload;
             console.log("AI ->", message);
+            setConversationState("speaking");
           },
 
           onUserMessage: async (payload: any) => {
@@ -114,11 +116,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
           onEnd: async () => {
             console.log("Conversation ended.");
+            setConversationState("idle");
           },
         },
       });
 
-      setMicMuted(true);
+      setConversationRef(convo);
+      setConversationState("thinking");
+      setIsMuted(true);
       console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
     } catch (err) {
       console.error("❌ Conversation start error:", err);
@@ -139,10 +144,16 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * ------------------------------------------------------------------ */
   const handleEndConversation = async () => {
     try {
-      await endSession();
-      console.log("👋 Session closed by user.");
+      if (conversationRef && conversationRef.endSession) {
+        await conversationRef.endSession();
+        console.log("👋 Session closed by user.");
+      }
     } catch (e) {
       console.error("endSession error", e);
+    } finally {
+      setConversationRef(null);
+      setConversationState("idle");
+      setIsMuted(true);
     }
   };
 
@@ -150,8 +161,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
    * Toggle microphone mute state
    * ------------------------------------------------------------------ */
   const handleToggleMute = () => {
-    setMicMuted(!micMuted);
-    console.log(micMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
+    if (!conversationRef) return;
+
+    setIsMuted(!isMuted);
+    console.log(isMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
   };
 
   return (
