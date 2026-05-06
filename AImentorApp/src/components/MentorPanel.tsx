@@ -30,6 +30,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
   const mentorName = "AI Mentor";
 
+  useEffect(() => {
+    if (!isListening && !micMuted) {
+      setMicMuted(true);
+    }
+  }, [isListening, micMuted, setMicMuted]);
+
   // Derive conversationState from hook status
   useEffect(() => {
     if (status === "connected") {
@@ -112,6 +118,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         },
       });
 
+      setMicMuted(true);
       console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
     } catch (err) {
       console.error("❌ Conversation start error:", err);
