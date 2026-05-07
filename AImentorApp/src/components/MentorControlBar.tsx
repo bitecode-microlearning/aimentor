@@ -1,5 +1,5 @@
 import React from "react";
-import { Mic, MicOff, PhoneOff, SkipForward, X } from "lucide-react";
+import { Mic, MicOff, PhoneOff, X } from "lucide-react";
 import { Button } from "./ui/button";
 import type { MentorControlState } from "./mentorControls";
 
@@ -7,7 +7,6 @@ interface MentorControlBarProps {
   state: MentorControlState;
   isMicMuted: boolean;
   isBusy?: boolean;
-  onSkip: () => void;
   onMuteToggle: () => void;
   onDone: () => void;
   onCancelAsk: () => void;
@@ -47,25 +46,10 @@ function ControlButton({
   );
 }
 
-function MicState({ isMicMuted }: { isMicMuted: boolean }) {
-  return (
-    <div
-      className={`flex min-h-12 items-center gap-2 rounded-full px-4 text-sm font-medium shadow-lg ${
-        isMicMuted ? "bg-white text-[#666666]" : "bg-[#00CE8D] text-white"
-      }`}
-      aria-live="polite"
-    >
-      {isMicMuted ? <MicOff size={18} /> : <Mic size={18} />}
-      <span>{isMicMuted ? "Microphone muted" : "Microphone on"}</span>
-    </div>
-  );
-}
-
 export function MentorControlBar({
   state,
   isMicMuted,
   isBusy = false,
-  onSkip,
   onMuteToggle,
   onDone,
   onCancelAsk,
@@ -95,10 +79,6 @@ export function MentorControlBar({
 
         {state === "mentor_waiting_for_answer" && (
           <>
-            <MicState isMicMuted={isMicMuted} />
-            <ControlButton ariaLabel="Skip current question" variant="secondary" disabled={isBusy} onClick={onSkip}>
-              <SkipForward size={18} /> Skip
-            </ControlButton>
             <ControlButton ariaLabel={isMicMuted ? "Unmute microphone" : "Mute microphone"} variant={isMicMuted ? "success" : "primary"} disabled={isBusy} onClick={onMuteToggle}>
               {isMicMuted ? <Mic size={18} /> : <MicOff size={18} />}
               {isMicMuted ? "Unmute" : "Mute"}
@@ -108,7 +88,6 @@ export function MentorControlBar({
 
         {state === "user_question_mode" && (
           <>
-            <MicState isMicMuted={isMicMuted} />
             <ControlButton ariaLabel="Done asking question" variant="success" disabled={isBusy} onClick={onDone}>
               <MicOff size={18} /> Done
             </ControlButton>
@@ -120,7 +99,6 @@ export function MentorControlBar({
 
         {state === "user_speaking" && (
           <>
-            <MicState isMicMuted={isMicMuted} />
             <ControlButton ariaLabel={isMicMuted ? "Unmute microphone" : "Mute microphone"} variant={isMicMuted ? "success" : "primary"} disabled={isBusy} onClick={onMuteToggle}>
               {isMicMuted ? <Mic size={18} /> : <MicOff size={18} />}
               {isMicMuted ? "Unmute" : "Mute"}
@@ -128,12 +106,6 @@ export function MentorControlBar({
             <ControlButton ariaLabel="Done answering" variant="success" disabled={isBusy} onClick={onDone}>
               Done
             </ControlButton>
-          </>
-        )}
-
-        {state === "muted_waiting" && (
-          <>
-            <MicState isMicMuted={isMicMuted} />
           </>
         )}
 
