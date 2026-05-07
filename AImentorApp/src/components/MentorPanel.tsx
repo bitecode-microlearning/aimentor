@@ -421,14 +421,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           className="mentor-status-bar"
           title={lastMentorMessage || undefined}
         >
-          <div className="mentor-status-progress mentor-status-progress-top">
-            <div
-              className="mentor-status-progress-fill"
-              style={{
-                width: `${isSessionActive ? Math.max(sessionProgress, 8) : 100}%`,
-              }}
-            />
-          </div>
           <div className="mentor-status-content">
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
             {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
