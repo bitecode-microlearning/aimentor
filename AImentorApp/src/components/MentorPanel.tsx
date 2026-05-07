@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Conversation } from "@elevenlabs/client";
 import mentorPhoto from "./img/AI_anna.gif";
-import { Card } from "./ui/card";
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
@@ -418,8 +417,15 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
       {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
-        <div className="absolute left-0 right-0 top-0 z-10">
-          <Card className="rounded-none border-x-0 border-t-0 border-b border-white/30 bg-black/50 px-4 py-3 text-white shadow-lg backdrop-blur-md" title={lastMentorMessage || undefined}>
+        <div
+          className="absolute inset-x-0 top-0 z-30 overflow-hidden border-b border-white/30 px-4 pb-4 pt-3 text-white shadow-lg"
+          title={lastMentorMessage || undefined}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.55)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+          }}
+        >
             <div className="flex items-center gap-3">
               {mentorSessionState === "mentor_speaking" && <Volume2 className="text-[#00CE8D]" size={24} />}
               {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
@@ -433,22 +439,22 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
                 {errorMessage && <p className="text-sm text-red-100">{errorMessage}</p>}
               </div>
             </div>
-            {isSessionActive && (
-              <div
-                className="mt-3 h-2 overflow-hidden rounded-full bg-white/35"
-                role="progressbar"
-                aria-label="Estimated session progress"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(sessionProgress)}
-              >
-                <div
-                  className="h-full rounded-full bg-[#00CE8D] shadow-[0_0_10px_rgba(0,206,141,0.65)] transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.max(sessionProgress, 2)}%` }}
-                />
-              </div>
-            )}
-          </Card>
+          <div
+            className="absolute bottom-0 left-0 right-0 h-2 bg-white/35"
+            role="progressbar"
+            aria-label="Estimated session progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(sessionProgress)}
+          >
+            <div
+              className="h-full bg-[#00CE8D] transition-[width] duration-700 ease-out"
+              style={{
+                width: `${isSessionActive ? Math.max(sessionProgress, 8) : 100}%`,
+                boxShadow: "0 0 12px rgba(0, 206, 141, 0.75)",
+              }}
+            />
+          </div>
         </div>
       )}
 
