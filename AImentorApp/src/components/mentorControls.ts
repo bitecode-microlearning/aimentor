@@ -9,8 +9,6 @@ export type MentorControlState =
   | "disconnected"
   | "error";
 
-export type SpeakingSpeedPreference = "normal" | "slow" | "fast";
-
 const questionPhrases = [
   "can you",
   "what do you think",

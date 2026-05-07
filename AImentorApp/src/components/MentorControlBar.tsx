@@ -1,23 +1,17 @@
 import React from "react";
-import { HelpCircle, Mic, MicOff, Rabbit, RotateCcw, SkipForward, Snail, X } from "lucide-react";
+import { Mic, MicOff, SkipForward, X } from "lucide-react";
 import { Button } from "./ui/button";
-import type { MentorControlState, SpeakingSpeedPreference } from "./mentorControls";
+import type { MentorControlState } from "./mentorControls";
 
 interface MentorControlBarProps {
   state: MentorControlState;
   isMicMuted: boolean;
-  speedPreference: SpeakingSpeedPreference;
   isBusy?: boolean;
-  onRepeat: () => void;
-  onSlower: () => void;
-  onFaster: () => void;
   onAsk: () => void;
-  onHint: () => void;
   onSkip: () => void;
   onMuteToggle: () => void;
   onDone: () => void;
   onCancelAsk: () => void;
-  onEndSession: () => void;
 }
 
 function ControlButton({
@@ -70,13 +64,8 @@ function MicState({ isMicMuted }: { isMicMuted: boolean }) {
 export function MentorControlBar({
   state,
   isMicMuted,
-  speedPreference,
   isBusy = false,
-  onRepeat,
-  onSlower,
-  onFaster,
   onAsk,
-  onHint,
   onSkip,
   onMuteToggle,
   onDone,
@@ -97,28 +86,19 @@ export function MentorControlBar({
 
         {state === "mentor_speaking" && (
           <>
-            <ControlButton ariaLabel="Repeat last explanation" variant="secondary" disabled={isBusy} onClick={onRepeat}>
-              <RotateCcw size={18} /> Repeat
-            </ControlButton>
-            <ControlButton ariaLabel="Ask mentor to speak slower" variant={speedPreference === "slow" ? "primary" : "secondary"} disabled={isBusy} onClick={onSlower}>
-              <Snail size={18} /> Slower
-            </ControlButton>
-            <ControlButton ariaLabel="Ask mentor to speak faster" variant={speedPreference === "fast" ? "primary" : "secondary"} disabled={isBusy} onClick={onFaster}>
-              <Rabbit size={18} /> Faster
+            <ControlButton ariaLabel={isMicMuted ? "Unmute microphone" : "Mute microphone"} variant={isMicMuted ? "success" : "primary"} disabled={isBusy} onClick={onMuteToggle}>
+              {isMicMuted ? <Mic size={18} /> : <MicOff size={18} />}
+              {isMicMuted ? "Unmute" : "Mute"}
             </ControlButton>
             <ControlButton ariaLabel="Ask a question" variant="success" disabled={isBusy} onClick={onAsk}>
               <Mic size={18} /> Ask
             </ControlButton>
-            <span className="basis-full text-center text-xs font-medium text-[#666666]">Speed: {speedPreference}</span>
           </>
         )}
 
         {state === "mentor_waiting_for_answer" && (
           <>
             <MicState isMicMuted={isMicMuted} />
-            <ControlButton ariaLabel="Ask for a hint" variant="secondary" disabled={isBusy} onClick={onHint}>
-              <HelpCircle size={18} /> Hint
-            </ControlButton>
             <ControlButton ariaLabel="Skip current question" variant="secondary" disabled={isBusy} onClick={onSkip}>
               <SkipForward size={18} /> Skip
             </ControlButton>

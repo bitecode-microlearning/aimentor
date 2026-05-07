@@ -9,7 +9,6 @@ import {
   getReadableError,
   isMentorAskingQuestion,
   type MentorControlState,
-  type SpeakingSpeedPreference,
 } from "./mentorControls";
 import { MessageSquare, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
 
@@ -40,7 +39,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [isMicMuted, setIsMicMuted] = useState(true);
   const [userManuallyMuted, setUserManuallyMuted] = useState(false);
   const [lastMentorMessage, setLastMentorMessage] = useState("");
-  const [speedPreference, setSpeedPreference] = useState<SpeakingSpeedPreference>("normal");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
 
@@ -97,7 +95,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     userManuallyMutedRef.current = false;
     setUserManuallyMuted(false);
     setIsMicMuted(true);
-    setSpeedPreference("normal");
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
     setIsActionBusy(false);
@@ -317,26 +314,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  const handleRepeat = () => {
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    sendMentorInstruction("Please repeat the last explanation briefly and clearly. Do not introduce a new concept.");
-  };
-
-  const handleSlower = () => {
-    setSpeedPreference("slow");
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    sendMentorInstruction("Please continue slower, use shorter sentences, and pause slightly between ideas.");
-  };
-
-  const handleFaster = () => {
-    setSpeedPreference("fast");
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    sendMentorInstruction("Please continue a bit faster and be more concise. Keep the explanation clear.");
-  };
-
   const handleAsk = async () => {
     if (!conversationRef.current) return;
 
@@ -351,12 +328,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     } catch (error) {
       debugMentorControls("failed to send user activity", error);
     }
-  };
-
-  const handleHint = () => {
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    sendMentorInstruction("Give the learner a small hint for the current question, but do not reveal the full answer.");
   };
 
   const handleSkip = () => {
@@ -447,9 +418,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               {mentorSessionState === "connecting" && <div className="h-4 w-4 rounded-full border-2 border-[#FE9613] animate-pulse" />}
               <div>
                 <p className="font-medium text-[#333333]">{getStatusLabel()}</p>
-                {speedPreference !== "normal" && isSessionActive && (
-                  <p className="text-xs text-[#666666]">Speed preference: {speedPreference}</p>
-                )}
                 {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
                   <p className="text-xs text-[#666666]">You muted manually. The app will wait until the next mentor question.</p>
                 )}
@@ -495,18 +463,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <MentorControlBar
         state={mentorSessionState}
         isMicMuted={isMicMuted}
-        speedPreference={speedPreference}
         isBusy={isActionBusy}
-        onRepeat={handleRepeat}
-        onSlower={handleSlower}
-        onFaster={handleFaster}
         onAsk={handleAsk}
-        onHint={handleHint}
         onSkip={handleSkip}
         onMuteToggle={handleMuteToggle}
         onDone={handleDone}
         onCancelAsk={handleCancelAsk}
-        onEndSession={handleEndConversation}
       />
     </div>
   );
