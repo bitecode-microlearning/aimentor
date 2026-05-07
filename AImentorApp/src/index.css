@@ -1998,8 +1998,8 @@ html {
   border-bottom: 1px solid rgba(255, 255, 255, .3) !important;
   border-radius: 0 !important;
   box-shadow: 0 8px 22px rgba(0, 0, 0, .2) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(1.15) !important;
-  backdrop-filter: blur(12px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(var(--blur-sm)) saturate(1.15) !important;
+  backdrop-filter: blur(var(--blur-sm)) saturate(1.15) !important;
 }
 
 .mentor-status-content {
