@@ -9,7 +9,7 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { MessageSquare, Mic, MicOff, Volume2 } from "lucide-react";
+import { MessageSquare, Volume2 } from "lucide-react";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -100,6 +100,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  const switchToMentorSpeaking = () => {
+    previousSafeStateRef.current = "mentor_speaking";
+    setUserManuallyMuted(false);
+    userManuallyMutedRef.current = false;
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+  };
+
   const resetSessionState = (nextState: MentorControlState = "disconnected") => {
     conversationRef.current = null;
     clearPendingUnmute();
@@ -166,6 +174,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       lastMentorMessageRef.current = text;
       setLastMentorMessage(text);
       debugMentorControls("mentor message", text);
+
+      if (stateRef.current === "mentor_waiting_for_answer" || stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") {
+        switchToMentorSpeaking();
+      }
     }
   };
 
@@ -174,11 +186,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     debugMentorControls("mode event", modeEvent);
 
     if (nextMode === "speaking") {
-      if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
-      previousSafeStateRef.current = "mentor_speaking";
-      setUserManuallyMuted(false);
-      userManuallyMutedRef.current = false;
-      setControlState("mentor_speaking");
+      switchToMentorSpeaking();
       return;
     }
 
@@ -355,12 +363,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  const handleSkip = () => {
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    sendMentorInstruction("Skip this question. Briefly explain the correct answer, then continue with the lesson.");
-  };
-
   const handleMuteToggle = () => {
     const nextMuted = !isMicMuted;
 
@@ -373,8 +375,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const handleDone = () => {
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
+    switchToMentorSpeaking();
     sendMentorInstruction("I'm done answering. Please evaluate my answer and continue.");
   };
 
@@ -388,7 +389,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const getStatusLabel = () => {
     if (mentorSessionState === "connecting") return "Connecting...";
     if (mentorSessionState === "mentor_speaking") return "Mentor is explaining...";
-    if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn - microphone is on";
+    if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn";
     if (mentorSessionState === "user_question_mode") return "Listening to your question...";
     if (mentorSessionState === "user_speaking") return "Listening to your answer...";
     if (mentorSessionState === "muted_waiting") return "Mentor is paused";
@@ -423,8 +424,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         >
           <div className="mentor-status-content">
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
-            {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
-              (isMicMuted ? <MicOff className="mentor-status-icon mentor-status-icon-orange" size={24} /> : <Mic className="mentor-status-icon mentor-status-icon-green" size={24} />)}
             {mentorSessionState === "connecting" && <div className="mentor-status-spinner" />}
             <div className="mentor-status-text">
               <p>{getStatusLabel()}</p>
@@ -488,7 +487,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         state={mentorSessionState}
         isMicMuted={isMicMuted}
         isBusy={isActionBusy}
-        onSkip={handleSkip}
         onMuteToggle={handleMuteToggle}
         onDone={handleDone}
         onCancelAsk={handleCancelAsk}
