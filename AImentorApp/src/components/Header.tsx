@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { Heart, Home, Menu, X } from "lucide-react";
+import { BookOpen, Heart, Home, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
 
 import bitecodeLogo from "./img/bitcode_logo_mini_clear.png";
 
@@ -42,6 +42,36 @@ export function Header({ courseName }: HeaderProps) {
       >
         <Home size={18} />
         <span>Home</span>
+      </a>
+      <a
+        href="https://www.bitecode.co/courses"
+        className="header-nav-link"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => setIsOpen(false)}
+      >
+        <BookOpen size={18} />
+        <span>Courses</span>
+      </a>
+      <a
+        href="https://www.bitecode.co/home/feedback"
+        className="header-nav-link"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => setIsOpen(false)}
+      >
+        <MessageSquare size={18} />
+        <span>Feedback</span>
+      </a>
+      <a
+        href="https://www.bitecode.co/home/legal-terms-privacy"
+        className="header-nav-link"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => setIsOpen(false)}
+      >
+        <ShieldCheck size={18} />
+        <span>Legal Terms & Privacy</span>
       </a>
       <a
         href="https://buymeacoffee.com/bitecode"
