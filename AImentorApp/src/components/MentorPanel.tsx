@@ -26,26 +26,46 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   >("idle");
   const [isMuted, setIsMuted] = useState(true);
   const conversationRef = useRef<any>(null);
+  const unmuteTimerRef = useRef<number | null>(null);
 
   const mentorName = "AI Mentor";
 
-  // Auto-mute when agent is speaking
-  useEffect(() => {
-    if (conversationState === "speaking") {
-      setIsMuted(true);
+  const setMicrophoneMuted = (muted: boolean) => {
+    setIsMuted(muted);
+    conversationRef.current?.setMicMuted?.(muted);
+  };
+
+  const clearPendingUnmute = () => {
+    if (unmuteTimerRef.current !== null) {
+      window.clearTimeout(unmuteTimerRef.current);
+      unmuteTimerRef.current = null;
     }
+  };
+
+  // Keep the real microphone state in sync with the agent mode.
+  useEffect(() => {
+    if (!conversationRef.current) return;
+
+    clearPendingUnmute();
+
+    if (conversationState === "speaking" || conversationState === "thinking") {
+      setMicrophoneMuted(true);
+      return;
+    }
+
+    if (conversationState === "listening") {
+      unmuteTimerRef.current = window.setTimeout(() => {
+        setMicrophoneMuted(false);
+        unmuteTimerRef.current = null;
+      }, 250);
+    }
+
+    return clearPendingUnmute;
   }, [conversationState]);
 
-  // Auto-enable unmute after agent finishes speaking (with delay to allow for response processing)
   useEffect(() => {
-    if (conversationState === "listening" && isMuted) {
-      // Small delay to ensure agent has fully stopped speaking
-      const timer = setTimeout(() => {
-        setIsMuted(false);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [conversationState, isMuted]);
+    return clearPendingUnmute;
+  }, []);
 
   // Config error state: when present we show an error page instead of the Mentor UI.
   const [configError, setConfigError] = useState<string | null>(null);
@@ -102,19 +122,50 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           knowledgelevel: knowledgelevel || "beginner",
           content: content || "",
         },
+        onConnect: () => {
+          console.log("ElevenLabs session connected.");
+          setConversationState("thinking");
+        },
+        onDisconnect: () => {
+          console.log("ElevenLabs session disconnected.");
+          conversationRef.current = null;
+          clearPendingUnmute();
+          setConversationState("idle");
+          setIsMuted(true);
+        },
+        onError: (error: unknown) => {
+          console.error("ElevenLabs conversation error:", error);
+        },
+        onModeChange: (mode: any) => {
+          const nextMode = mode?.mode;
+
+          if (nextMode === "speaking") {
+            setConversationState("speaking");
+            return;
+          }
+
+          if (nextMode === "listening") {
+            setConversationState("listening");
+          }
+        },
+        onMessage: (message: any) => {
+          const source = message?.source ?? message?.role;
+          const text = message?.message ?? message?.text ?? message;
+
+          if (source === "user") {
+            console.log("User ->", text);
+            setConversationState("thinking");
+            return;
+          }
+
+          if (source === "ai" || source === "agent") {
+            console.log("AI ->", text);
+          }
+        },
         clientTools: {
           logMessage: async (payload: any) => {
             const message = payload?.message ?? payload;
             console.log("AI ->", message);
-            setConversationState("speaking");
-
-            // Auto-transition back to listening after a delay (estimate speaking duration)
-            // This is a heuristic - adjust the delay based on typical response lengths
-            setTimeout(() => {
-              if (conversationRef.current) {
-                setConversationState("listening");
-              }
-            }, 2000); // 2 second delay - adjust as needed
           },
 
           onUserMessage: async (payload: any) => {
@@ -132,7 +183,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       conversationRef.current = convo;
       setConversationState("thinking");
-      setIsMuted(true);
+      setMicrophoneMuted(true);
       console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
     } catch (err) {
       console.error("❌ Conversation start error:", err);
@@ -161,6 +212,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       console.error("endSession error", e);
     } finally {
       conversationRef.current = null;
+      clearPendingUnmute();
       setConversationState("idle");
       setIsMuted(true);
     }
@@ -172,7 +224,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const handleToggleMute = () => {
     if (!conversationRef.current) return;
 
-    setIsMuted(!isMuted);
+    setMicrophoneMuted(!isMuted);
     console.log(isMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
   };
 
