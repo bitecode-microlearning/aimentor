@@ -27,7 +27,7 @@ type ConversationInstance = {
   sendUserActivity?: () => Promise<void> | void;
 };
 
-const ESTIMATED_SESSION_SECONDS = 10 * 60;
+const ESTIMATED_SESSION_SECONDS = 5 * 60;
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
