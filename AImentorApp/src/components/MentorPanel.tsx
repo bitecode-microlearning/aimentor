@@ -418,45 +418,32 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
         <div
-          className="overflow-hidden px-4 pb-4 pt-4 text-white"
+          className="mentor-status-bar"
           title={lastMentorMessage || undefined}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 80,
-            background: "rgba(17, 24, 39, 0.72)",
-            backdropFilter: "blur(14px)",
-            WebkitBackdropFilter: "blur(14px)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.28)",
-            boxShadow: "0 12px 30px rgba(0, 0, 0, 0.28)",
-          }}
         >
-          <div className="absolute left-0 right-0 top-0 h-1 bg-white/30">
+          <div className="mentor-status-progress mentor-status-progress-top">
             <div
-              className="h-full bg-[#00CE8D]"
+              className="mentor-status-progress-fill"
               style={{
                 width: `${isSessionActive ? Math.max(sessionProgress, 8) : 100}%`,
-                boxShadow: "0 0 12px rgba(0, 206, 141, 0.85)",
               }}
             />
           </div>
-          <div className="flex items-center gap-3">
-            {mentorSessionState === "mentor_speaking" && <Volume2 className="shrink-0 text-[#00CE8D]" size={24} />}
+          <div className="mentor-status-content">
+            {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
             {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
-              (isMicMuted ? <MicOff className="shrink-0 text-[#FE9613]" size={24} /> : <Mic className="shrink-0 text-[#00CE8D]" size={24} />)}
-            {mentorSessionState === "connecting" && <div className="h-4 w-4 shrink-0 rounded-full border-2 border-[#FE9613] animate-pulse" />}
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-white drop-shadow-md">{getStatusLabel()}</p>
+              (isMicMuted ? <MicOff className="mentor-status-icon mentor-status-icon-orange" size={24} /> : <Mic className="mentor-status-icon mentor-status-icon-green" size={24} />)}
+            {mentorSessionState === "connecting" && <div className="mentor-status-spinner" />}
+            <div className="mentor-status-text">
+              <p>{getStatusLabel()}</p>
               {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
-                <p className="text-xs text-white/85">You muted manually. The app will wait until the next mentor question.</p>
+                <span>You muted manually. The app will wait until the next mentor question.</span>
               )}
-              {errorMessage && <p className="text-sm text-red-100">{errorMessage}</p>}
+              {errorMessage && <strong>{errorMessage}</strong>}
             </div>
           </div>
           <div
-            className="absolute bottom-0 left-0 right-0 h-2 bg-white/30"
+            className="mentor-status-progress mentor-status-progress-bottom"
             role="progressbar"
             aria-label="Estimated session progress"
             aria-valuemin={0}
@@ -464,10 +451,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             aria-valuenow={Math.round(sessionProgress)}
           >
             <div
-              className="h-full bg-[#00CE8D] transition-[width] duration-700 ease-out"
+              className="mentor-status-progress-fill"
               style={{
                 width: `${isSessionActive ? Math.max(sessionProgress, 8) : 100}%`,
-                boxShadow: "0 0 12px rgba(0, 206, 141, 0.75)",
               }}
             />
           </div>
