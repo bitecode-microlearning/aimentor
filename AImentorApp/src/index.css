@@ -1989,23 +1989,23 @@ html {
   z-index: 80 !important;
   display: block !important;
   width: 100% !important;
-  min-height: 68px !important;
-  padding: 16px 16px 18px !important;
+  min-height: 46px !important;
+  padding: 10px 16px 12px !important;
   overflow: hidden !important;
   color: #fff !important;
-  background: rgba(17, 24, 39, .76) !important;
+  background: rgba(64, 72, 89, .52) !important;
   border: 0 !important;
   border-bottom: 1px solid rgba(255, 255, 255, .3) !important;
   border-radius: 0 !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .32) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.1) !important;
-  backdrop-filter: blur(16px) saturate(1.1) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .2) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.15) !important;
+  backdrop-filter: blur(12px) saturate(1.15) !important;
 }
 
 .mentor-status-content {
   display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
+  gap: 10px !important;
   min-width: 0 !important;
 }
 
@@ -2038,9 +2038,10 @@ html {
 .mentor-status-text p {
   margin: 0 !important;
   color: #fff !important;
+  font-size: 14px !important;
   font-weight: 700 !important;
-  line-height: 1.25 !important;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, .65) !important;
+  line-height: 1.2 !important;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .45) !important;
 }
 
 .mentor-status-text span {
@@ -2067,14 +2068,9 @@ html {
   background: rgba(255, 255, 255, .35) !important;
 }
 
-.mentor-status-progress-top {
-  top: 0 !important;
-  height: 3px !important;
-}
-
 .mentor-status-progress-bottom {
   bottom: 0 !important;
-  height: 7px !important;
+  height: 5px !important;
 }
 
 .mentor-status-progress-fill {
