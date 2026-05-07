@@ -1,5 +1,5 @@
 import React from "react";
-import { Mic, MicOff, SkipForward, X } from "lucide-react";
+import { Mic, MicOff, PhoneOff, SkipForward, X } from "lucide-react";
 import { Button } from "./ui/button";
 import type { MentorControlState } from "./mentorControls";
 
@@ -7,11 +7,11 @@ interface MentorControlBarProps {
   state: MentorControlState;
   isMicMuted: boolean;
   isBusy?: boolean;
-  onAsk: () => void;
   onSkip: () => void;
   onMuteToggle: () => void;
   onDone: () => void;
   onCancelAsk: () => void;
+  onEndSession: () => void;
 }
 
 function ControlButton({
@@ -65,11 +65,11 @@ export function MentorControlBar({
   state,
   isMicMuted,
   isBusy = false,
-  onAsk,
   onSkip,
   onMuteToggle,
   onDone,
   onCancelAsk,
+  onEndSession,
 }: MentorControlBarProps) {
   if (state === "idle" || state === "disconnected" || state === "error") {
     return null;
@@ -89,9 +89,6 @@ export function MentorControlBar({
             <ControlButton ariaLabel={isMicMuted ? "Unmute microphone" : "Mute microphone"} variant={isMicMuted ? "success" : "primary"} disabled={isBusy} onClick={onMuteToggle}>
               {isMicMuted ? <Mic size={18} /> : <MicOff size={18} />}
               {isMicMuted ? "Unmute" : "Mute"}
-            </ControlButton>
-            <ControlButton ariaLabel="Ask a question" variant="success" disabled={isBusy} onClick={onAsk}>
-              <Mic size={18} /> Ask
             </ControlButton>
           </>
         )}
@@ -137,11 +134,12 @@ export function MentorControlBar({
         {state === "muted_waiting" && (
           <>
             <MicState isMicMuted={isMicMuted} />
-            <ControlButton ariaLabel="Ask a question" variant="success" disabled={isBusy} onClick={onAsk}>
-              <Mic size={18} /> Ask
-            </ControlButton>
           </>
         )}
+
+        <ControlButton ariaLabel="End mentor session" variant="danger" disabled={isBusy && state === "connecting"} onClick={onEndSession}>
+          <PhoneOff size={18} /> End session
+        </ControlButton>
       </div>
     </div>
   );
