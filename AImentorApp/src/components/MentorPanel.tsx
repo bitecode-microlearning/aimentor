@@ -1,9 +1,17 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Conversation } from "@elevenlabs/client";
 import mentorPhoto from "./img/AI_anna.gif";
 import { Card } from "./ui/card";
 import { Button } from "./ui/button";
-import { MessageSquare, Volume2, VolumeX } from "lucide-react";
+import { MentorControlBar } from "./MentorControlBar";
+import {
+  debugMentorControls,
+  getReadableError,
+  isMentorAskingQuestion,
+  type MentorControlState,
+  type SpeakingSpeedPreference,
+} from "./mentorControls";
+import { MessageSquare, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -13,6 +21,14 @@ interface MentorPanelProps {
   knowledgelevel?: string;
 }
 
+type ConversationInstance = {
+  endSession?: () => Promise<void> | void;
+  setMicMuted?: (muted: boolean) => Promise<void> | void;
+  sendUserMessage?: (message: string) => Promise<void> | void;
+  sendContextualUpdate?: (message: string) => Promise<void> | void;
+  sendUserActivity?: () => Promise<void> | void;
+};
+
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
   coursename,
@@ -20,19 +36,31 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   content,
   knowledgelevel,
 }) => {
-  // --- UI and conversation state variables
-  const [conversationState, setConversationState] = useState<
-    "idle" | "listening" | "thinking" | "speaking"
-  >("idle");
-  const [isMuted, setIsMuted] = useState(true);
-  const conversationRef = useRef<any>(null);
+  const [mentorSessionState, setMentorSessionState] = useState<MentorControlState>("idle");
+  const [isMicMuted, setIsMicMuted] = useState(true);
+  const [userManuallyMuted, setUserManuallyMuted] = useState(false);
+  const [lastMentorMessage, setLastMentorMessage] = useState("");
+  const [speedPreference, setSpeedPreference] = useState<SpeakingSpeedPreference>("normal");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isActionBusy, setIsActionBusy] = useState(false);
+
+  const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
+  const stateRef = useRef<MentorControlState>("idle");
+  const userManuallyMutedRef = useRef(false);
+  const lastMentorMessageRef = useRef("");
+  const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
 
-  const mentorName = "AI Mentor";
+  const mentorPhotoSrc = ((mentorPhoto as any)?.default as string) || (mentorPhoto as string);
+  const isSessionActive =
+    mentorSessionState !== "idle" &&
+    mentorSessionState !== "disconnected" &&
+    mentorSessionState !== "error";
 
-  const setMicrophoneMuted = (muted: boolean) => {
-    setIsMuted(muted);
-    conversationRef.current?.setMicMuted?.(muted);
+  const setControlState = (nextState: MentorControlState) => {
+    debugMentorControls("state change", { from: stateRef.current, to: nextState });
+    stateRef.current = nextState;
+    setMentorSessionState(nextState);
   };
 
   const clearPendingUnmute = () => {
@@ -42,79 +70,190 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  // Keep the real microphone state in sync with the agent mode.
+  const setMicrophoneMuted = (muted: boolean) => {
+    clearPendingUnmute();
+    setIsMicMuted(muted);
+
+    try {
+      const muteResult = conversationRef.current?.setMicMuted?.(muted);
+      if (muteResult && typeof (muteResult as Promise<void>).catch === "function") {
+        (muteResult as Promise<void>).catch((error) => {
+          debugMentorControls("failed to update microphone", error);
+          setErrorMessage("Could not update the microphone state.");
+          setControlState("error");
+        });
+      }
+      debugMentorControls(muted ? "microphone muted" : "microphone unmuted");
+    } catch (error) {
+      debugMentorControls("failed to update microphone", error);
+      setErrorMessage("Could not update the microphone state.");
+      setControlState("error");
+    }
+  };
+
+  const resetSessionState = (nextState: MentorControlState = "disconnected") => {
+    conversationRef.current = null;
+    clearPendingUnmute();
+    userManuallyMutedRef.current = false;
+    setUserManuallyMuted(false);
+    setIsMicMuted(true);
+    setSpeedPreference("normal");
+    setLastMentorMessage("");
+    lastMentorMessageRef.current = "";
+    setIsActionBusy(false);
+    setControlState(nextState);
+  };
+
+  const sendMentorInstruction = async (instruction: string) => {
+    const conversation = conversationRef.current;
+
+    if (!conversation) {
+      setErrorMessage("The mentor session is not connected.");
+      setControlState("error");
+      return;
+    }
+
+    setIsActionBusy(true);
+    try {
+      if (conversation.sendUserMessage) {
+        await conversation.sendUserMessage(instruction);
+      } else if (conversation.sendContextualUpdate) {
+        await conversation.sendContextualUpdate(instruction);
+      } else {
+        throw new Error("This ElevenLabs SDK instance cannot send user messages.");
+      }
+    } catch (error) {
+      setErrorMessage(getReadableError(error));
+      setControlState("error");
+    } finally {
+      setIsActionBusy(false);
+    }
+  };
+
+  const extractMessageText = (message: any) => {
+    return String(message?.message ?? message?.text ?? message?.transcript ?? "");
+  };
+
+  const extractMessageSource = (message: any) => {
+    return String(message?.source ?? message?.role ?? "").toLowerCase();
+  };
+
+  const handleMentorMessage = (message: any) => {
+    const text = extractMessageText(message);
+    const source = extractMessageSource(message);
+
+    if (!text) return;
+
+    if (source === "user") {
+      if (stateRef.current === "mentor_waiting_for_answer" || stateRef.current === "user_question_mode") {
+        setControlState("user_speaking");
+      }
+      return;
+    }
+
+    if (source === "ai" || source === "agent" || source === "assistant") {
+      lastMentorMessageRef.current = text;
+      setLastMentorMessage(text);
+      debugMentorControls("mentor message", text);
+    }
+  };
+
+  const handleModeChange = (modeEvent: any) => {
+    const nextMode = String(modeEvent?.mode ?? modeEvent ?? "").toLowerCase();
+    debugMentorControls("mode event", modeEvent);
+
+    if (nextMode === "speaking") {
+      if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
+      previousSafeStateRef.current = "mentor_speaking";
+      setUserManuallyMuted(false);
+      userManuallyMutedRef.current = false;
+      setControlState("mentor_speaking");
+      return;
+    }
+
+    if (nextMode === "listening") {
+      if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
+
+      if (isMentorAskingQuestion(lastMentorMessageRef.current)) {
+        userManuallyMutedRef.current = false;
+        setUserManuallyMuted(false);
+        setControlState("mentor_waiting_for_answer");
+      } else {
+        setControlState("muted_waiting");
+      }
+      return;
+    }
+
+    debugMentorControls("unexpected mode event", modeEvent);
+  };
+
   useEffect(() => {
     if (!conversationRef.current) return;
 
     clearPendingUnmute();
 
-    if (conversationState === "speaking" || conversationState === "thinking") {
+    if (mentorSessionState === "mentor_speaking" || mentorSessionState === "connecting" || mentorSessionState === "muted_waiting") {
       setMicrophoneMuted(true);
       return;
     }
 
-    if (conversationState === "listening") {
+    if (mentorSessionState === "mentor_waiting_for_answer") {
+      if (userManuallyMutedRef.current) {
+        setMicrophoneMuted(true);
+        return;
+      }
+
       unmuteTimerRef.current = window.setTimeout(() => {
         setMicrophoneMuted(false);
-        unmuteTimerRef.current = null;
-      }, 250);
+      }, 200);
+      return clearPendingUnmute;
+    }
+
+    if (mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") {
+      setMicrophoneMuted(false);
     }
 
     return clearPendingUnmute;
-  }, [conversationState]);
+  }, [mentorSessionState]);
 
   useEffect(() => {
-    return clearPendingUnmute;
+    return () => {
+      clearPendingUnmute();
+      conversationRef.current?.endSession?.();
+      conversationRef.current = null;
+    };
   }, []);
 
-  // Config error state: when present we show an error page instead of the Mentor UI.
-  const [configError, setConfigError] = useState<string | null>(null);
-
-  /** ------------------------------------------------------------------
-   * Start a new AI mentor session
-   * ------------------------------------------------------------------ */
   const handleStartConversation = async () => {
+    if (mentorSessionState === "connecting" || isSessionActive) return;
+
+    setErrorMessage(null);
+    setControlState("connecting");
+    setIsMicMuted(true);
+
     try {
-      // Dynamically import config and require WORKER_AGENT_URL to be present.
       let WORKER_AGENT_URL: string | undefined;
       try {
         const cfg = await import("../config/workerConfig");
-        if (cfg && cfg.WORKER_AGENT_URL) {
-          WORKER_AGENT_URL = cfg.WORKER_AGENT_URL;
-        }
-      } catch (cfgErr) {
-        const errAny = cfgErr as any;
-        const msg = errAny?.message ?? String(cfgErr);
-        console.error("Failed to load agent config:", cfgErr);
-        setConfigError(`Failed to load agent config: ${msg}`);
-        return;
+        WORKER_AGENT_URL = cfg?.WORKER_AGENT_URL;
+      } catch (error) {
+        throw new Error(`Failed to load agent config: ${getReadableError(error)}`);
       }
 
       if (!WORKER_AGENT_URL) {
-        const message = "Missing WORKER_AGENT_URL in src/config/agentConfig.ts";
-        console.error(message);
-        setConfigError(message);
-        return;
+        throw new Error("Missing WORKER_AGENT_URL in src/config/workerConfig.ts");
       }
 
-      // --- 1️⃣ Request a signed session URL from the Cloudflare Worker
       const res = await fetch(WORKER_AGENT_URL);
       const data = await res.json();
 
       if (!res.ok || !data.signed_url) {
-        console.warn("⚠️ Unable to get a signed session. Try again later.");
-        return;
+        throw new Error("Unable to get a signed mentor session. Please try again later.");
       }
 
-      const signedUrl = data.signed_url;
-      console.log("🔐 Signed URL received:", signedUrl);
-
-      console.log("Sending initial parameters to Elevenlabs: ", userfirstname, coursename, lessonname, knowledgelevel, content);
-
-      // --- 2️⃣ Start the ElevenLabs conversation session
       const convo = await Conversation.startSession({
-        signedUrl,                     // or agentId if you prefer static mode
-        connectionType: "websocket",   // required for real-time
+        signedUrl: data.signed_url,
+        connectionType: "websocket",
         dynamicVariables: {
           userfirstname: userfirstname || "User",
           coursename: coursename || "Unknown Course",
@@ -123,233 +262,252 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           content: content || "",
         },
         onConnect: () => {
-          console.log("ElevenLabs session connected.");
-          setConversationState("thinking");
+          debugMentorControls("session connected");
         },
         onDisconnect: () => {
-          console.log("ElevenLabs session disconnected.");
-          conversationRef.current = null;
-          clearPendingUnmute();
-          setConversationState("idle");
-          setIsMuted(true);
+          debugMentorControls("session disconnected");
+          resetSessionState("disconnected");
         },
         onError: (error: unknown) => {
-          console.error("ElevenLabs conversation error:", error);
+          setErrorMessage(getReadableError(error));
+          resetSessionState("error");
         },
-        onModeChange: (mode: any) => {
-          const nextMode = mode?.mode;
-
-          if (nextMode === "speaking") {
-            setConversationState("speaking");
-            return;
-          }
-
-          if (nextMode === "listening") {
-            setConversationState("listening");
-          }
+        onStatusChange: (status: any) => {
+          debugMentorControls("status event", status);
         },
-        onMessage: (message: any) => {
-          const source = message?.source ?? message?.role;
-          const text = message?.message ?? message?.text ?? message;
-
-          if (source === "user") {
-            console.log("User ->", text);
-            setConversationState("thinking");
-            return;
-          }
-
-          if (source === "ai" || source === "agent") {
-            console.log("AI ->", text);
-          }
-        },
+        onModeChange: handleModeChange,
+        onMessage: handleMentorMessage,
         clientTools: {
           logMessage: async (payload: any) => {
-            const message = payload?.message ?? payload;
-            console.log("AI ->", message);
+            handleMentorMessage({ source: "agent", message: payload?.message ?? payload });
           },
-
           onUserMessage: async (payload: any) => {
-            const message = payload?.message ?? payload;
-            console.log("User ->", message);
-            setConversationState("thinking");
+            handleMentorMessage({ source: "user", message: payload?.message ?? payload });
           },
-
           onEnd: async () => {
-            console.log("Conversation ended.");
-            setConversationState("idle");
+            resetSessionState("disconnected");
           },
         },
       });
 
-      conversationRef.current = convo;
-      setConversationState("thinking");
+      conversationRef.current = convo as ConversationInstance;
       setMicrophoneMuted(true);
-      console.log("📡 Dynamic variables sent to ElevenLabs successfully.");
-    } catch (err) {
-      console.error("❌ Conversation start error:", err);
-      console.error("❌ Error starting conversation.");
+      debugMentorControls("dynamic variables sent", { userfirstname, coursename, lessonname, knowledgelevel });
+    } catch (error) {
+      setErrorMessage(getReadableError(error));
+      resetSessionState("error");
     }
   };
 
-  // Resolve image src (some bundlers return a module object with `default`)
-  const mentorPhotoSrc = ((mentorPhoto as any)?.default as string) || (mentorPhoto as string);
-
-  /** ------------------------------------------------------------------
-   * Send a follow-up question during an active session
-   * ------------------------------------------------------------------ */
-  // single-button flow — ask or end handled via handleStartConversation / handleEndConversation
-
-  /** ------------------------------------------------------------------
-   * End the current conversation manually
-   * ------------------------------------------------------------------ */
   const handleEndConversation = async () => {
+    if (isActionBusy) return;
+
+    const conversation = conversationRef.current;
+    setIsActionBusy(true);
+    setMicrophoneMuted(true);
+
     try {
-      if (conversationRef.current && conversationRef.current.endSession) {
-        await conversationRef.current.endSession();
-        console.log("👋 Session closed by user.");
+      if (conversation?.endSession) {
+        await conversation.endSession();
       }
-    } catch (e) {
-      console.error("endSession error", e);
-    } finally {
-      conversationRef.current = null;
-      clearPendingUnmute();
-      setConversationState("idle");
-      setIsMuted(true);
+      resetSessionState("disconnected");
+    } catch (error) {
+      setErrorMessage(`Failed to end session cleanly: ${getReadableError(error)}`);
+      resetSessionState("error");
     }
   };
 
-  /** ------------------------------------------------------------------
-   * Toggle microphone mute state
-   * ------------------------------------------------------------------ */
-  const handleToggleMute = () => {
+  const handleRepeat = () => {
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("Please repeat the last explanation briefly and clearly. Do not introduce a new concept.");
+  };
+
+  const handleSlower = () => {
+    setSpeedPreference("slow");
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("Please continue slower, use shorter sentences, and pause slightly between ideas.");
+  };
+
+  const handleFaster = () => {
+    setSpeedPreference("fast");
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("Please continue a bit faster and be more concise. Keep the explanation clear.");
+  };
+
+  const handleAsk = async () => {
     if (!conversationRef.current) return;
 
-    setMicrophoneMuted(!isMuted);
-    console.log(isMuted ? "🎤 Microphone unmuted" : "🔇 Microphone muted");
+    previousSafeStateRef.current = stateRef.current === "mentor_speaking" ? "mentor_speaking" : "muted_waiting";
+    userManuallyMutedRef.current = false;
+    setUserManuallyMuted(false);
+    setControlState("user_question_mode");
+    setMicrophoneMuted(false);
+
+    try {
+      await conversationRef.current.sendUserActivity?.();
+    } catch (error) {
+      debugMentorControls("failed to send user activity", error);
+    }
+  };
+
+  const handleHint = () => {
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("Give the learner a small hint for the current question, but do not reveal the full answer.");
+  };
+
+  const handleSkip = () => {
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("Skip this question. Briefly explain the correct answer, then continue with the lesson.");
+  };
+
+  const handleMuteToggle = () => {
+    const nextMuted = !isMicMuted;
+
+    if (mentorSessionState === "mentor_waiting_for_answer") {
+      userManuallyMutedRef.current = nextMuted;
+      setUserManuallyMuted(nextMuted);
+    }
+
+    setMicrophoneMuted(nextMuted);
+  };
+
+  const handleDone = () => {
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    sendMentorInstruction("I'm done answering. Please evaluate my answer and continue.");
+  };
+
+  const handleCancelAsk = () => {
+    userManuallyMutedRef.current = true;
+    setUserManuallyMuted(true);
+    setMicrophoneMuted(true);
+    setControlState(previousSafeStateRef.current === "mentor_speaking" ? "muted_waiting" : previousSafeStateRef.current);
+  };
+
+  const getStatusLabel = () => {
+    if (mentorSessionState === "connecting") return "Connecting...";
+    if (mentorSessionState === "mentor_speaking") return "Mentor is explaining...";
+    if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn - microphone is on";
+    if (mentorSessionState === "user_question_mode") return "Listening to your question...";
+    if (mentorSessionState === "user_speaking") return "Listening to your answer...";
+    if (mentorSessionState === "muted_waiting") return "Mentor is paused";
+    if (mentorSessionState === "error") return "Mentor session error";
+    if (mentorSessionState === "disconnected") return "Mentor session ended";
+    return "";
   };
 
   return (
-  <div className="relative h-full min-h-[500px] lg:min-h-[600px] rounded-3xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100">
-      {configError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white">
-          <Card className="max-w-lg mx-6 p-6 text-center">
-            <h3 className="text-lg font-semibold">Configuration error</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{configError}</p>
-            <div className="mt-4">
-              <Button onClick={() => setConfigError(null)}>Dismiss</Button>
-            </div>
-          </Card>
-        </div>
-      )}
-      {/* Mentor Image: on mobile show top 2/3 (cropped bottom); on desktop show full image */}
-      <div className="absolute left-0 right-0 top-0 h-[66%] lg:h-full overflow-hidden">
-        {/* Use an <img> for reliable loading and object-position control */}
+    <div className="relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
+      <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
         <img
           src={mentorPhotoSrc}
           alt="Mentor"
-          className="w-full h-full object-top object-cover lg:object-contain lg:object-center"
+          className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
           style={{
-            filter: conversationState === "listening" || conversationState === "speaking" ? "brightness(0.7)" : "brightness(1)",
+            filter: isSessionActive ? "brightness(0.72)" : "brightness(1)",
             transition: "filter 0.3s ease",
           }}
-          onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-            console.error("Mentor image failed to load:", (e.target as HTMLImageElement).src);
-            // Don't set configError here; showing a config overlay hides the mentor UI entirely.
-            // Keep the failure logged so you can inspect the network/console in the browser.
+          onError={(event: React.SyntheticEvent<HTMLImageElement, Event>) => {
+            debugMentorControls("mentor image failed to load", (event.target as HTMLImageElement).src);
           }}
         />
       </div>
-      
-      {/* Overlay gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-      
-      {/* Status Indicator (shows when not idle) */}
-      {conversationState !== "idle" && (
-        <div className="absolute top-4 left-4 right-4 z-10">
-          <Card className="bg-white/95 backdrop-blur-sm px-4 py-3 shadow-lg border-0">
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+
+      {isSessionActive && (
+        <div className="absolute right-4 top-4 z-20">
+          <Button
+            type="button"
+            onClick={handleEndConversation}
+            disabled={isActionBusy && mentorSessionState === "connecting"}
+            aria-label="End mentor session"
+            className="min-h-11 rounded-full bg-red-500 px-4 text-white shadow-2xl hover:bg-red-600 disabled:opacity-60"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <PhoneOff size={18} />
+              End session
+            </span>
+          </Button>
+        </div>
+      )}
+
+      {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
+        <div className="absolute left-4 right-4 top-4 z-10 pr-0 sm:pr-44">
+          <Card className="border-0 bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" title={lastMentorMessage || undefined}>
             <div className="flex items-center gap-3">
-              {conversationState === "listening" && (
-                <>
-                  <div className="flex gap-1">
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1 h-6 bg-[#1376C8] rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                  </div>
-                  <span className="text-[#1376C8]">
-                    {isMuted ? "Waiting for you to unmute..." : "Listening..."}
-                  </span>
-                </>
-              )}
-
-              {conversationState === "thinking" && (
-                <>
-                  <div className="h-4 w-4 rounded-full border-2 border-[#F59E0B] animate-pulse" />
-                  <span className="text-[#F59E0B]">Thinking...</span>
-                </>
-              )}
-
-              {conversationState === "speaking" && (
-                <>
-                  <Volume2 className="text-[#00CE8D] animate-pulse" size={24} />
-                  <span className="text-[#00CE8D]">{mentorName} is speaking...</span>
-                </>
-              )}
+              {mentorSessionState === "mentor_speaking" && <Volume2 className="text-[#00CE8D]" size={24} />}
+              {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
+                (isMicMuted ? <MicOff className="text-[#FE9613]" size={24} /> : <Mic className="text-[#00CE8D]" size={24} />)}
+              {mentorSessionState === "connecting" && <div className="h-4 w-4 rounded-full border-2 border-[#FE9613] animate-pulse" />}
+              <div>
+                <p className="font-medium text-[#333333]">{getStatusLabel()}</p>
+                {speedPreference !== "normal" && isSessionActive && (
+                  <p className="text-xs text-[#666666]">Speed preference: {speedPreference}</p>
+                )}
+                {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
+                  <p className="text-xs text-[#666666]">You muted manually. The app will wait until the next mentor question.</p>
+                )}
+                {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
+              </div>
             </div>
           </Card>
         </div>
       )}
-      
-  {/* Chat removed - single-button flow */}
-          
-          {/* Control Buttons */}
-          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
-            {conversationState === "listening" && (
-              <Button
-                onClick={handleToggleMute}
-                size="lg"
-                className={`rounded-full shadow-2xl disabled:opacity-60 ${
-                  isMuted
-                    ? "bg-[#1376C8] hover:bg-[#0f5a99] text-white"
-                    : "bg-[#F59E0B] hover:bg-[#d97706] text-white"
-                }`}
-              >
-                <div className="flex items-center gap-3 px-4 py-2">
-                  {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                  <span className="font-medium">
-                    {isMuted ? "Unmute" : "Mute"}
-                  </span>
-                </div>
-              </Button>
-            )}
 
-            {conversationState !== "idle" && isMuted && (
-              <Button
-                onClick={handleEndConversation}
-                size="lg"
-                className="bg-red-500 hover:bg-red-600 text-white shadow-2xl rounded-full"
-              >
-                <div className="flex items-center gap-3 px-4 py-2">
-                  <VolumeX size={20} />
-                  <span className="font-medium">Stop Conversation</span>
-                </div>
-              </Button>
-            )}
+      {mentorSessionState === "idle" && (
+        <div className="absolute bottom-4 right-4 z-10">
+          <Button
+            type="button"
+            onClick={handleStartConversation}
+            size="lg"
+            className="rounded-full bg-[#00CE8D] text-white shadow-2xl hover:bg-[#00b87d] disabled:opacity-60"
+          >
+            <span className="flex items-center gap-3 px-4 py-2 font-medium">
+              <MessageSquare size={20} />
+              Start lesson
+            </span>
+          </Button>
+        </div>
+      )}
 
-            {conversationState === "idle" && (
-              <Button
-                onClick={handleStartConversation}
-                disabled={conversationState === "thinking"}
-                size="lg"
-                className="bg-[#00CE8D] hover:bg-[#00b87d] text-white shadow-2xl rounded-full disabled:opacity-60"
-              >
-                <div className="flex items-center gap-3 px-4 py-2">
-                  <MessageSquare size={20} />
-                  <span className="font-medium">Start lesson..</span>
-                </div>
-              </Button>
-            )}
-          </div>
-      
+      {(mentorSessionState === "disconnected" || mentorSessionState === "error") && (
+        <div className="absolute bottom-4 right-4 z-10">
+          <Button
+            type="button"
+            onClick={handleStartConversation}
+            size="lg"
+            className="rounded-full bg-[#1376C8] text-white shadow-2xl hover:bg-[#0f5a99] disabled:opacity-60"
+          >
+            <span className="flex items-center gap-3 px-4 py-2 font-medium">
+              <MessageSquare size={20} />
+              Restart session
+            </span>
+          </Button>
+        </div>
+      )}
+
+      <MentorControlBar
+        state={mentorSessionState}
+        isMicMuted={isMicMuted}
+        speedPreference={speedPreference}
+        isBusy={isActionBusy}
+        onRepeat={handleRepeat}
+        onSlower={handleSlower}
+        onFaster={handleFaster}
+        onAsk={handleAsk}
+        onHint={handleHint}
+        onSkip={handleSkip}
+        onMuteToggle={handleMuteToggle}
+        onDone={handleDone}
+        onCancelAsk={handleCancelAsk}
+        onEndSession={handleEndConversation}
+      />
     </div>
   );
 };
