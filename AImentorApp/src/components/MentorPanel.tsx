@@ -28,6 +28,8 @@ type ConversationInstance = {
   sendUserActivity?: () => Promise<void> | void;
 };
 
+const ESTIMATED_SESSION_SECONDS = 10 * 60;
+
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
   coursename,
@@ -41,9 +43,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [lastMentorMessage, setLastMentorMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
+  const [sessionProgress, setSessionProgress] = useState(0);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
+  const progressTimerRef = useRef<number | null>(null);
+  const sessionStartedAtRef = useRef<number | null>(null);
   const stateRef = useRef<MentorControlState>("idle");
   const userManuallyMutedRef = useRef(false);
   const lastMentorMessageRef = useRef("");
@@ -65,6 +70,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (unmuteTimerRef.current !== null) {
       window.clearTimeout(unmuteTimerRef.current);
       unmuteTimerRef.current = null;
+    }
+  };
+
+  const clearProgressTimer = () => {
+    if (progressTimerRef.current !== null) {
+      window.clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
     }
   };
 
@@ -97,6 +109,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setIsMicMuted(true);
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
+    sessionStartedAtRef.current = null;
+    clearProgressTimer();
+    setSessionProgress(0);
     setIsActionBusy(false);
     setControlState(nextState);
   };
@@ -216,10 +231,35 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   useEffect(() => {
     return () => {
       clearPendingUnmute();
+      clearProgressTimer();
       conversationRef.current?.endSession?.();
       conversationRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isSessionActive) {
+      clearProgressTimer();
+      return;
+    }
+
+    if (!sessionStartedAtRef.current) {
+      sessionStartedAtRef.current = Date.now();
+    }
+
+    const updateProgress = () => {
+      const startedAt = sessionStartedAtRef.current ?? Date.now();
+      const elapsedSeconds = (Date.now() - startedAt) / 1000;
+      const nextProgress = Math.min(100, (elapsedSeconds / ESTIMATED_SESSION_SECONDS) * 100);
+      setSessionProgress(nextProgress);
+    };
+
+    updateProgress();
+    clearProgressTimer();
+    progressTimerRef.current = window.setInterval(updateProgress, 1000);
+
+    return clearProgressTimer;
+  }, [isSessionActive]);
 
   const handleStartConversation = async () => {
     if (mentorSessionState === "connecting" || isSessionActive) return;
@@ -227,6 +267,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setErrorMessage(null);
     setControlState("connecting");
     setIsMicMuted(true);
+    sessionStartedAtRef.current = Date.now();
+    setSessionProgress(0);
 
     try {
       let WORKER_AGENT_URL: string | undefined;
@@ -377,20 +419,35 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
         <div className="absolute left-4 right-4 top-4 z-10">
-          <Card className="border-0 bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" title={lastMentorMessage || undefined}>
+          <Card className="border border-white/25 bg-white/20 px-4 py-3 text-white shadow-lg backdrop-blur-md" title={lastMentorMessage || undefined}>
             <div className="flex items-center gap-3">
               {mentorSessionState === "mentor_speaking" && <Volume2 className="text-[#00CE8D]" size={24} />}
               {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
-                (isMicMuted ? <MicOff className="text-[#FE9613]" size={24} /> : <Mic className="text-[#00CE8D]" size={24} />)}
+                (isMicMuted ? <MicOff className="text-[#FE9613]" size={24} /> : <Mic className="text-[#A7F3D0]" size={24} />)}
               {mentorSessionState === "connecting" && <div className="h-4 w-4 rounded-full border-2 border-[#FE9613] animate-pulse" />}
-              <div>
-                <p className="font-medium text-[#333333]">{getStatusLabel()}</p>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-white drop-shadow-sm">{getStatusLabel()}</p>
                 {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
-                  <p className="text-xs text-[#666666]">You muted manually. The app will wait until the next mentor question.</p>
+                  <p className="text-xs text-white/80">You muted manually. The app will wait until the next mentor question.</p>
                 )}
-                {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
+                {errorMessage && <p className="text-sm text-red-100">{errorMessage}</p>}
               </div>
             </div>
+            {isSessionActive && (
+              <div
+                className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25"
+                role="progressbar"
+                aria-label="Estimated session progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(sessionProgress)}
+              >
+                <div
+                  className="h-full rounded-full bg-[#A7F3D0] transition-[width] duration-700 ease-out"
+                  style={{ width: `${sessionProgress}%` }}
+                />
+              </div>
+            )}
           </Card>
         </div>
       )}
