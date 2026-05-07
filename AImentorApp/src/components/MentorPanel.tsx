@@ -10,7 +10,7 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { MessageSquare, Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
+import { MessageSquare, Mic, MicOff, Volume2 } from "lucide-react";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -314,22 +314,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
-  const handleAsk = async () => {
-    if (!conversationRef.current) return;
-
-    previousSafeStateRef.current = stateRef.current === "mentor_speaking" ? "mentor_speaking" : "muted_waiting";
-    userManuallyMutedRef.current = false;
-    setUserManuallyMuted(false);
-    setControlState("user_question_mode");
-    setMicrophoneMuted(false);
-
-    try {
-      await conversationRef.current.sendUserActivity?.();
-    } catch (error) {
-      debugMentorControls("failed to send user activity", error);
-    }
-  };
-
   const handleSkip = () => {
     setMicrophoneMuted(true);
     setControlState("mentor_speaking");
@@ -391,25 +375,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
-      {isSessionActive && (
-        <div className="absolute right-4 top-4 z-20">
-          <Button
-            type="button"
-            onClick={handleEndConversation}
-            disabled={isActionBusy && mentorSessionState === "connecting"}
-            aria-label="End mentor session"
-            className="min-h-11 rounded-full bg-red-500 px-4 text-white shadow-2xl hover:bg-red-600 disabled:opacity-60"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <PhoneOff size={18} />
-              End session
-            </span>
-          </Button>
-        </div>
-      )}
-
       {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
-        <div className="absolute left-4 right-4 top-4 z-10 pr-0 sm:pr-44">
+        <div className="absolute left-4 right-4 top-4 z-10">
           <Card className="border-0 bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" title={lastMentorMessage || undefined}>
             <div className="flex items-center gap-3">
               {mentorSessionState === "mentor_speaking" && <Volume2 className="text-[#00CE8D]" size={24} />}
@@ -464,11 +431,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         state={mentorSessionState}
         isMicMuted={isMicMuted}
         isBusy={isActionBusy}
-        onAsk={handleAsk}
         onSkip={handleSkip}
         onMuteToggle={handleMuteToggle}
         onDone={handleDone}
         onCancelAsk={handleCancelAsk}
+        onEndSession={handleEndConversation}
       />
     </div>
   );
