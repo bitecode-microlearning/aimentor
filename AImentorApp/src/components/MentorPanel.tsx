@@ -418,12 +418,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
       {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
-        <div className="absolute left-4 right-4 top-4 z-10">
-          <Card className="border border-white/25 bg-white/20 px-4 py-3 text-white shadow-lg backdrop-blur-md" title={lastMentorMessage || undefined}>
+        <div className="absolute left-0 right-0 top-0 z-10">
+          <Card className="rounded-none border-x-0 border-t-0 border-b border-white/30 bg-black/50 px-4 py-3 text-white shadow-lg backdrop-blur-md" title={lastMentorMessage || undefined}>
             <div className="flex items-center gap-3">
               {mentorSessionState === "mentor_speaking" && <Volume2 className="text-[#00CE8D]" size={24} />}
               {(mentorSessionState === "mentor_waiting_for_answer" || mentorSessionState === "user_question_mode" || mentorSessionState === "user_speaking") &&
-                (isMicMuted ? <MicOff className="text-[#FE9613]" size={24} /> : <Mic className="text-[#A7F3D0]" size={24} />)}
+                (isMicMuted ? <MicOff className="text-[#FE9613]" size={24} /> : <Mic className="text-[#00CE8D]" size={24} />)}
               {mentorSessionState === "connecting" && <div className="h-4 w-4 rounded-full border-2 border-[#FE9613] animate-pulse" />}
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-white drop-shadow-sm">{getStatusLabel()}</p>
@@ -435,7 +435,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             </div>
             {isSessionActive && (
               <div
-                className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/25"
+                className="mt-3 h-2 overflow-hidden rounded-full bg-white/35"
                 role="progressbar"
                 aria-label="Estimated session progress"
                 aria-valuemin={0}
@@ -443,8 +443,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
                 aria-valuenow={Math.round(sessionProgress)}
               >
                 <div
-                  className="h-full rounded-full bg-[#A7F3D0] transition-[width] duration-700 ease-out"
-                  style={{ width: `${sessionProgress}%` }}
+                  className="h-full rounded-full bg-[#00CE8D] shadow-[0_0_10px_rgba(0,206,141,0.65)] transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.max(sessionProgress, 2)}%` }}
                 />
               </div>
             )}
