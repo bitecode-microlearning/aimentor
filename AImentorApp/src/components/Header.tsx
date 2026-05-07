@@ -1,8 +1,8 @@
 import * as React from "react";
-import { useState } from "react";
-import { Home, Heart, Menu, X } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { Button } from './ui/button';
+import { useEffect, useState } from "react";
+import { Heart, Home, Menu, X } from "lucide-react";
+
+import bitecodeLogo from "./img/bitcode_logo_mini_clear.png";
 
 interface HeaderProps {
   courseName: string;
@@ -11,11 +11,31 @@ interface HeaderProps {
 export function Header({ courseName }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
   const NavLinks = () => (
     <>
-      <a 
-        href="https://bitecode.co" 
-        className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+      <a
+        href="https://bitecode.co"
+        className="header-nav-link"
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
@@ -23,9 +43,9 @@ export function Header({ courseName }: HeaderProps) {
         <Home size={18} />
         <span>Home</span>
       </a>
-      <a 
-        href="https://buymeacoffee.com/bitecode" 
-        className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-white/15 transition-all no-underline text-white"
+      <a
+        href="https://buymeacoffee.com/bitecode"
+        className="header-nav-link"
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
@@ -37,66 +57,90 @@ export function Header({ courseName }: HeaderProps) {
   );
 
   return (
-    <header className="w-full bg-[#1376C8] text-white shadow-lg sticky top-0 z-50">
-      <div className="w-full max-w-7xl mx-auto px-4 py-4">
-        {/* Desktop View */}
-        <div className="hidden md:flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center transition-transform hover:scale-105">
-              <span className="text-2xl">📚</span>
+    <header className="app-header">
+      <div className="app-header-inner">
+        <div className="header-desktop">
+          <div className="header-brand">
+            <div className="header-logo header-logo-desktop">
+              <img src={bitecodeLogo} alt="BiteCode" />
             </div>
             <div>
-              <h1 className="m-0">BiteCode - {courseName}</h1>
-              <h2 className="m-0 text-sm opacity-80">AI Mentoring Lesson</h2>
+              <h1 className="header-title">BiteCode - {courseName}</h1>
+              <h2 className="header-subtitle">AI Mentoring Lesson</h2>
             </div>
           </div>
-          
-          <nav className="flex items-center gap-4">
+
+          <nav className="header-nav" aria-label="Primary navigation">
             <NavLinks />
           </nav>
         </div>
 
-        {/* Mobile View - Logo + Hamburger */}
-        <div className="flex md:hidden items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-xl">📚</span>
+        <div className="header-mobile">
+          <div className="header-brand header-brand-mobile">
+            <div className="header-logo header-logo-mobile">
+              <img src={bitecodeLogo} alt="BiteCode" />
             </div>
             <div>
-              <h1 className="m-0 text-base">BiteCode - {courseName}</h1>
-              <h2 className="m-0 text-xs opacity-80">AI Mentoring Lesson</h2>
+              <h1 className="header-title header-title-mobile">
+                BiteCode - {courseName}
+              </h1>
+              <h2 className="header-subtitle header-subtitle-mobile">
+                AI Mentoring Lesson
+              </h2>
             </div>
           </div>
-          
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
-            <SheetTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="text-white hover:bg-white/15"
-              >
-                <Menu size={24} />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="bg-[#1376C8] text-white border-l border-white/20">
-              <SheetHeader>
-                <SheetTitle className="text-white flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                    <span className="text-xl">📚</span>
-                  </div>
-                  <div className="text-left">
-                    <div>BiteCode</div>
-                    <div className="text-sm opacity-80">{courseName}</div>
-                  </div>
-                </SheetTitle>
-              </SheetHeader>
-              <nav className="flex flex-col gap-2 mt-8">
-                <NavLinks />
-              </nav>
-            </SheetContent>
-          </Sheet>
+
+          <button
+            type="button"
+            className="header-menu-button"
+            aria-label="Open navigation menu"
+            aria-controls="mobile-navigation"
+            aria-expanded={isOpen}
+            onClick={() => setIsOpen(true)}
+          >
+            <Menu size={24} />
+          </button>
         </div>
       </div>
+
+      {isOpen && (
+        <div className="mobile-menu-layer" role="presentation">
+          <button
+            type="button"
+            className="mobile-menu-overlay"
+            aria-label="Close navigation menu"
+            onClick={() => setIsOpen(false)}
+          />
+          <aside
+            id="mobile-navigation"
+            className="mobile-menu-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
+          >
+            <div className="mobile-menu-header">
+              <div className="header-logo header-logo-mobile">
+                <img src={bitecodeLogo} alt="BiteCode" />
+              </div>
+              <div className="mobile-menu-title">
+                <div>BiteCode</div>
+                <span>{courseName}</span>
+              </div>
+              <button
+                type="button"
+                className="header-menu-button mobile-menu-close"
+                aria-label="Close navigation menu"
+                onClick={() => setIsOpen(false)}
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <nav className="mobile-menu-nav" aria-label="Mobile navigation">
+              <NavLinks />
+            </nav>
+          </aside>
+        </div>
+      )}
     </header>
   );
 }
