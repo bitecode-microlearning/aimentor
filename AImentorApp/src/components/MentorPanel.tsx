@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Conversation } from "@elevenlabs/client";
-import mentorPhoto from "./img/AI_anna.gif";
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
@@ -28,6 +27,13 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
+const mentorVideos = Object.entries(
+  import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
+)
+  .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath))
+  .map(([, videoUrl]) => videoUrl as string);
+
+const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
@@ -43,6 +49,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
+  const [mentorVideo] = useState(pickRandomMentorVideo);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
@@ -53,7 +60,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const lastMentorMessageRef = useRef("");
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
 
-  const mentorPhotoSrc = ((mentorPhoto as any)?.default as string) || (mentorPhoto as string);
+  const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
     mentorSessionState !== "idle" &&
     mentorSessionState !== "disconnected" &&
@@ -401,16 +408,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   return (
     <div className="relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
-        <img
-          src={mentorPhotoSrc}
-          alt="Mentor"
+        <video
+          src={mentorVideoSrc}
+          aria-label="Mentor"
+          autoPlay
+          muted
+          loop
+          playsInline
           className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
           style={{
             filter: isSessionActive ? "brightness(0.72)" : "brightness(1)",
             transition: "filter 0.3s ease",
           }}
-          onError={(event: React.SyntheticEvent<HTMLImageElement, Event>) => {
-            debugMentorControls("mentor image failed to load", (event.target as HTMLImageElement).src);
+          onError={(event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+            debugMentorControls("mentor video failed to load", (event.target as HTMLVideoElement).currentSrc);
           }}
         />
       </div>
