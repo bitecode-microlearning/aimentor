@@ -27,52 +27,13 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
-const MIN_LAST_FRAME_HOLD_MS = 500;
-const MAX_LAST_FRAME_HOLD_MS = 3000;
-const VIDEO_FADE_OUT_MS = 180;
-const mentorSceneVideos = Object.entries(
-  import.meta.glob(["./img/scene*/*.mp4", "./img/scene/*/*.mp4"], {
-    eager: true,
-    query: "?url",
-    import: "default",
-  })
-).reduce<Record<string, string[]>>((scenes, [path, videoUrl]) => {
-  const pathParts = path.split("/");
-  const sceneName = pathParts[pathParts.length - 2];
-
-  if (!sceneName) return scenes;
-
-  scenes[sceneName] = [...(scenes[sceneName] ?? []), videoUrl as string];
-  return scenes;
-}, {});
-
-const fallbackMentorVideos = Object.entries(
+const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
   .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath))
   .map(([, videoUrl]) => videoUrl as string);
 
-const shuffleVideos = (videos: string[]) => {
-  const shuffled = [...videos];
-
-  for (let index = shuffled.length - 1; index > 0; index--) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
-  }
-
-  return shuffled;
-};
-
-const pickRandomMentorPlaylist = () => {
-  const scenes = Object.values(mentorSceneVideos).filter((videos) => videos.length > 0);
-  const selectedVideos =
-    scenes.length > 0 ? scenes[Math.floor(Math.random() * scenes.length)] : fallbackMentorVideos;
-
-  return shuffleVideos(selectedVideos);
-};
-
-const getRandomLastFrameHoldMs = () =>
-  MIN_LAST_FRAME_HOLD_MS + Math.random() * (MAX_LAST_FRAME_HOLD_MS - MIN_LAST_FRAME_HOLD_MS);
+const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
@@ -88,21 +49,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
-  const [mentorPlaylist, setMentorPlaylist] = useState(pickRandomMentorPlaylist);
-  const [mentorVideoIndex, setMentorVideoIndex] = useState(0);
-  const [isMentorVideoVisible, setIsMentorVideoVisible] = useState(true);
+  const [mentorVideo] = useState(pickRandomMentorVideo);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
-  const videoTransitionTimerRef = useRef<number | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
   const stateRef = useRef<MentorControlState>("idle");
   const userManuallyMutedRef = useRef(false);
   const lastMentorMessageRef = useRef("");
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
 
-  const mentorVideo = mentorPlaylist[mentorVideoIndex];
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
     mentorSessionState !== "idle" &&
@@ -126,13 +83,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (progressTimerRef.current !== null) {
       window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
-    }
-  };
-
-  const clearVideoTransitionTimer = () => {
-    if (videoTransitionTimerRef.current !== null) {
-      window.clearTimeout(videoTransitionTimerRef.current);
-      videoTransitionTimerRef.current = null;
     }
   };
 
@@ -296,7 +246,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return () => {
       clearPendingUnmute();
       clearProgressTimer();
-      clearVideoTransitionTimer();
       conversationRef.current?.endSession?.();
       conversationRef.current = null;
     };
@@ -456,33 +405,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return "";
   };
 
-  const handleMentorVideoEnded = () => {
-    if (mentorPlaylist.length <= 1) {
-      return;
-    }
-
-    clearVideoTransitionTimer();
-
-    videoTransitionTimerRef.current = window.setTimeout(() => {
-      setIsMentorVideoVisible(false);
-
-      videoTransitionTimerRef.current = window.setTimeout(() => {
-        if (mentorVideoIndex < mentorPlaylist.length - 1) {
-          setMentorVideoIndex((currentIndex) => currentIndex + 1);
-          return;
-        }
-
-        setMentorPlaylist((currentPlaylist) => shuffleVideos(currentPlaylist));
-        setMentorVideoIndex(0);
-      }, VIDEO_FADE_OUT_MS);
-    }, getRandomLastFrameHoldMs());
-  };
-
-  const handleMentorVideoReady = () => {
-    clearVideoTransitionTimer();
-    setIsMentorVideoVisible(true);
-  };
-
   return (
     <div className="relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
@@ -492,19 +414,16 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           aria-label="Mentor"
           autoPlay
           muted
-          loop={mentorPlaylist.length <= 1}
+          loop
           playsInline
           className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
           style={{
             filter: isSessionActive ? "brightness(0.72)" : "brightness(1)",
-            opacity: isMentorVideoVisible ? 1 : 0,
-            transition: "filter 0.3s ease, opacity 0.28s ease",
+            transition: "filter 0.3s ease",
           }}
           onError={(event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
             debugMentorControls("mentor video failed to load", (event.target as HTMLVideoElement).currentSrc);
           }}
-          onEnded={handleMentorVideoEnded}
-          onCanPlay={handleMentorVideoReady}
         />
       </div>
 
