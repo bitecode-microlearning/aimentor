@@ -27,6 +27,9 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
+const MIN_LAST_FRAME_HOLD_MS = 500;
+const MAX_LAST_FRAME_HOLD_MS = 3000;
+const VIDEO_FADE_OUT_MS = 180;
 const mentorSceneVideos = Object.entries(
   import.meta.glob(["./img/scene*/*.mp4", "./img/scene/*/*.mp4"], {
     eager: true,
@@ -68,6 +71,9 @@ const pickRandomMentorPlaylist = () => {
   return shuffleVideos(selectedVideos);
 };
 
+const getRandomLastFrameHoldMs = () =>
+  MIN_LAST_FRAME_HOLD_MS + Math.random() * (MAX_LAST_FRAME_HOLD_MS - MIN_LAST_FRAME_HOLD_MS);
+
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
   coursename,
@@ -84,10 +90,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [sessionProgress, setSessionProgress] = useState(0);
   const [mentorPlaylist, setMentorPlaylist] = useState(pickRandomMentorPlaylist);
   const [mentorVideoIndex, setMentorVideoIndex] = useState(0);
+  const [isMentorVideoVisible, setIsMentorVideoVisible] = useState(true);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
+  const videoTransitionTimerRef = useRef<number | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
   const stateRef = useRef<MentorControlState>("idle");
   const userManuallyMutedRef = useRef(false);
@@ -118,6 +126,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (progressTimerRef.current !== null) {
       window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
+    }
+  };
+
+  const clearVideoTransitionTimer = () => {
+    if (videoTransitionTimerRef.current !== null) {
+      window.clearTimeout(videoTransitionTimerRef.current);
+      videoTransitionTimerRef.current = null;
     }
   };
 
@@ -281,6 +296,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return () => {
       clearPendingUnmute();
       clearProgressTimer();
+      clearVideoTransitionTimer();
       conversationRef.current?.endSession?.();
       conversationRef.current = null;
     };
@@ -445,13 +461,26 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       return;
     }
 
-    if (mentorVideoIndex < mentorPlaylist.length - 1) {
-      setMentorVideoIndex((currentIndex) => currentIndex + 1);
-      return;
-    }
+    clearVideoTransitionTimer();
 
-    setMentorPlaylist((currentPlaylist) => shuffleVideos(currentPlaylist));
-    setMentorVideoIndex(0);
+    videoTransitionTimerRef.current = window.setTimeout(() => {
+      setIsMentorVideoVisible(false);
+
+      videoTransitionTimerRef.current = window.setTimeout(() => {
+        if (mentorVideoIndex < mentorPlaylist.length - 1) {
+          setMentorVideoIndex((currentIndex) => currentIndex + 1);
+          return;
+        }
+
+        setMentorPlaylist((currentPlaylist) => shuffleVideos(currentPlaylist));
+        setMentorVideoIndex(0);
+      }, VIDEO_FADE_OUT_MS);
+    }, getRandomLastFrameHoldMs());
+  };
+
+  const handleMentorVideoReady = () => {
+    clearVideoTransitionTimer();
+    setIsMentorVideoVisible(true);
   };
 
   return (
@@ -468,12 +497,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
           style={{
             filter: isSessionActive ? "brightness(0.72)" : "brightness(1)",
-            transition: "filter 0.3s ease",
+            opacity: isMentorVideoVisible ? 1 : 0,
+            transition: "filter 0.3s ease, opacity 0.28s ease",
           }}
           onError={(event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
             debugMentorControls("mentor video failed to load", (event.target as HTMLVideoElement).currentSrc);
           }}
           onEnded={handleMentorVideoEnded}
+          onCanPlay={handleMentorVideoReady}
         />
       </div>
 
