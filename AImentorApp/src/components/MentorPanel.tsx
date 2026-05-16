@@ -27,13 +27,46 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
-const mentorVideos = Object.entries(
+const mentorSceneVideos = Object.entries(
+  import.meta.glob(["./img/scene*/*.mp4", "./img/scene/*/*.mp4"], {
+    eager: true,
+    query: "?url",
+    import: "default",
+  })
+).reduce<Record<string, string[]>>((scenes, [path, videoUrl]) => {
+  const pathParts = path.split("/");
+  const sceneName = pathParts[pathParts.length - 2];
+
+  if (!sceneName) return scenes;
+
+  scenes[sceneName] = [...(scenes[sceneName] ?? []), videoUrl as string];
+  return scenes;
+}, {});
+
+const fallbackMentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
   .sort(([leftPath], [rightPath]) => leftPath.localeCompare(rightPath))
   .map(([, videoUrl]) => videoUrl as string);
 
-const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
+const shuffleVideos = (videos: string[]) => {
+  const shuffled = [...videos];
+
+  for (let index = shuffled.length - 1; index > 0; index--) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+};
+
+const pickRandomMentorPlaylist = () => {
+  const scenes = Object.values(mentorSceneVideos).filter((videos) => videos.length > 0);
+  const selectedVideos =
+    scenes.length > 0 ? scenes[Math.floor(Math.random() * scenes.length)] : fallbackMentorVideos;
+
+  return shuffleVideos(selectedVideos);
+};
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
@@ -49,7 +82,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
-  const [mentorVideo] = useState(pickRandomMentorVideo);
+  const [mentorPlaylist, setMentorPlaylist] = useState(pickRandomMentorPlaylist);
+  const [mentorVideoIndex, setMentorVideoIndex] = useState(0);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
@@ -60,6 +94,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const lastMentorMessageRef = useRef("");
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
 
+  const mentorVideo = mentorPlaylist[mentorVideoIndex];
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
     mentorSessionState !== "idle" &&
@@ -405,15 +440,30 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return "";
   };
 
+  const handleMentorVideoEnded = () => {
+    if (mentorPlaylist.length <= 1) {
+      return;
+    }
+
+    if (mentorVideoIndex < mentorPlaylist.length - 1) {
+      setMentorVideoIndex((currentIndex) => currentIndex + 1);
+      return;
+    }
+
+    setMentorPlaylist((currentPlaylist) => shuffleVideos(currentPlaylist));
+    setMentorVideoIndex(0);
+  };
+
   return (
     <div className="relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
         <video
+          key={mentorVideoSrc}
           src={mentorVideoSrc}
           aria-label="Mentor"
           autoPlay
           muted
-          loop
+          loop={mentorPlaylist.length <= 1}
           playsInline
           className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
           style={{
@@ -423,6 +473,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           onError={(event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
             debugMentorControls("mentor video failed to load", (event.target as HTMLVideoElement).currentSrc);
           }}
+          onEnded={handleMentorVideoEnded}
         />
       </div>
 
