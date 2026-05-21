@@ -8,7 +8,8 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { Coffee, MessageSquare, Volume2 } from "lucide-react";
+import { MessageSquare, Volume2 } from "lucide-react";
+import buyMeACoffeeCup from "./img/buymeacoffee-cup.gif";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -491,18 +492,21 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
       {isTokenSupportScreenVisible && (
-        <div className="absolute inset-0 z-30 flex items-end bg-[#F6F6F6] px-6 pb-8 pt-8 sm:items-center sm:px-10">
-          <div className="mx-auto flex w-full max-w-md flex-col gap-5 text-[#202124]">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FFF3C4] text-[#7A4D00]">
-              <Coffee size={24} aria-hidden="true" />
-            </div>
-            <div className="space-y-3">
-              <h2 className="text-2xl font-semibold leading-tight">The mentor is taking a short break</h2>
-              <p className="text-sm leading-6 text-[#4A4F55]">
+        <div className="absolute inset-0 z-30 flex items-end bg-[#F6F6F6] px-7 pb-10 pt-10 sm:items-center sm:px-12">
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-7 text-[#202124]">
+            <img
+              src={buyMeACoffeeCup}
+              alt=""
+              aria-hidden="true"
+              className="h-14 w-14 rounded-md object-contain"
+            />
+            <div className="space-y-5">
+              <h2 className="text-3xl font-semibold leading-tight">The mentor is taking a short break</h2>
+              <p className="text-base leading-7 text-[#4A4F55]">
                 The shared ElevenLabs token budget is currently too low to start a new AI mentor session. This limit
                 protects the free community service from running past its available monthly quota.
               </p>
-              <p className="text-sm leading-6 text-[#4A4F55]">
+              <p className="text-base leading-7 text-[#4A4F55]">
                 BiteCode stays free and ad-free thanks to community support. A small contribution helps add more
                 available mentor tokens for everyone.
               </p>
@@ -518,7 +522,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               className="w-full rounded-full bg-[#00CE8D] text-white shadow-xl hover:bg-[#00b87d] sm:w-fit"
             >
               <a href={BUY_ME_A_COFFEE_URL} target="_blank" rel="noreferrer">
-                <Coffee size={18} />
+                <img src={buyMeACoffeeCup} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
                 Support BiteCode
               </a>
             </Button>
