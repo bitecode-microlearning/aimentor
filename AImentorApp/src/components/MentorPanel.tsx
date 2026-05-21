@@ -298,9 +298,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       }
 
       const res = await fetch(WORKER_AGENT_URL);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
-      if (!res.ok || !data.signed_url) {
+      if (!res.ok || !data?.signed_url) {
+        if (typeof data?.error === "string" && data.error.trim()) {
+          throw new Error(data.error);
+        }
+
         throw new Error("Unable to get a signed mentor session. Please try again later.");
       }
 

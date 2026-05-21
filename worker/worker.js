@@ -1,3 +1,73 @@
+const DEFAULT_MIN_AVAILABLE_TOKENS = 2000;
+const TOKEN_UNAVAILABLE_ERROR =
+  "Kifogytunk a tokenből, ezért ez a szolgáltatás most nem elérhető. Ha szeretnéd használni, és van rá kapacitásod, támogasd a rendszert a Buy Me a Coffee-n: https://buymeacoffee.com/bitecode. Ezzel segítesz, hogy a rendszer reklámmentes és ingyenes maradjon, és több elérhető tokenje legyen a közösségnek.";
+
+function jsonResponse(body, status, headers) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...headers, "Content-Type": "application/json" },
+  });
+}
+
+function getMinimumAvailableTokens(env) {
+  const configuredLimit = Number(env.MIN_AVAILABLE_TOKENS ?? env.TOKEN_LIMIT);
+
+  if (!Number.isFinite(configuredLimit) || configuredLimit < 0) {
+    return DEFAULT_MIN_AVAILABLE_TOKENS;
+  }
+
+  return configuredLimit;
+}
+
+async function getElevenLabsSubscription(env) {
+  const res = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+    headers: { "xi-api-key": env.ELEVENLABS_API_KEY },
+  });
+
+  const text = await res.text();
+  let data = null;
+
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch (err) {
+    throw new Error(`Unable to parse subscription response: ${err.message}`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.detail?.message || data?.detail || data?.error || "Unable to load subscription details");
+  }
+
+  return data;
+}
+
+async function ensureEnoughAvailableTokens(env, corsHeaders) {
+  const subscription = await getElevenLabsSubscription(env);
+  const characterLimit = Number(subscription?.character_limit);
+  const characterCount = Number(subscription?.character_count);
+  const minimumAvailableTokens = getMinimumAvailableTokens(env);
+
+  if (!Number.isFinite(characterLimit) || !Number.isFinite(characterCount)) {
+    throw new Error("Subscription response is missing character_count or character_limit");
+  }
+
+  const availableTokens = characterLimit - characterCount;
+
+  if (availableTokens < minimumAvailableTokens) {
+    return jsonResponse(
+      {
+        error: TOKEN_UNAVAILABLE_ERROR,
+        code: "TOKEN_LIMIT_EXCEEDED",
+        availableTokens,
+        minimumAvailableTokens,
+      },
+      503,
+      corsHeaders
+    );
+  }
+
+  return null;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -66,6 +136,23 @@ export default {
 
     // --- 🔹 1. ElevenLabs agent endpoint ---
     if (pathname === "/agent") {
+      try {
+        const tokenLimitResponse = await ensureEnoughAvailableTokens(env, corsHeaders);
+
+        if (tokenLimitResponse) {
+          return tokenLimitResponse;
+        }
+      } catch (err) {
+        return jsonResponse(
+          {
+            error: "Unable to check token availability",
+            details: err.message,
+          },
+          502,
+          corsHeaders
+        );
+      }
+
       const apiUrl = `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(
         env.ELEVENLABS_AGENT_ID
       )}`;
@@ -75,6 +162,7 @@ export default {
 
       const text = await res.text();
       return new Response(text, {
+        status: res.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

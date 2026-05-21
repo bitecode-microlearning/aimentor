@@ -2,5 +2,13 @@ name = "bitecode-aimentor-worker"
 main = "worker.js"
 compatibility_date = "2025-10-19"
 
+[vars]
+# Minimum remaining ElevenLabs token/character budget required before creating a mentor session.
+MIN_AVAILABLE_TOKENS = "2000"
+
 [env.production]
-# Add production secrets in Cloudflare dashboard 
+# Add production secrets in Cloudflare dashboard.
+# Override MIN_AVAILABLE_TOKENS there if production needs a different threshold.
+
+[env.production.vars]
+MIN_AVAILABLE_TOKENS = "2000"
