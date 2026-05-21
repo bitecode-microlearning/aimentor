@@ -20,7 +20,23 @@ function getMinimumAvailableTokens(env) {
 }
 
 async function getElevenLabsSubscription(env) {
-  const res = await fetch("https://api.elevenlabs.io/v1/user/subscription", {
+  const subscription = await fetchElevenLabsJson("https://api.elevenlabs.io/v1/user/subscription", env);
+
+  if (subscription?.character_limit !== undefined && subscription?.character_count !== undefined) {
+    return subscription;
+  }
+
+  const user = await fetchElevenLabsJson("https://api.elevenlabs.io/v1/user", env);
+
+  if (user?.subscription) {
+    return user.subscription;
+  }
+
+  throw new Error("Subscription response is missing subscription details");
+}
+
+async function fetchElevenLabsJson(apiUrl, env) {
+  const res = await fetch(apiUrl, {
     headers: { "xi-api-key": env.ELEVENLABS_API_KEY },
   });
 
@@ -34,10 +50,35 @@ async function getElevenLabsSubscription(env) {
   }
 
   if (!res.ok) {
-    throw new Error(data?.detail?.message || data?.detail || data?.error || "Unable to load subscription details");
+    throw new Error(getElevenLabsErrorMessage(data, res.status));
   }
 
   return data;
+}
+
+function getElevenLabsErrorMessage(data, status) {
+  const detail = data?.detail;
+
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (typeof detail?.message === "string") {
+    return detail.message;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item?.msg || item?.message || JSON.stringify(item))
+      .filter(Boolean)
+      .join("; ");
+  }
+
+  if (typeof data?.error === "string") {
+    return data.error;
+  }
+
+  return `ElevenLabs API returned HTTP ${status}`;
 }
 
 async function ensureEnoughAvailableTokens(env, corsHeaders) {
@@ -145,7 +186,7 @@ export default {
       } catch (err) {
         return jsonResponse(
           {
-            error: "Unable to check token availability",
+            error: `Nem sikerült ellenőrizni az elérhető token keretet: ${err.message}`,
             details: err.message,
           },
           502,
