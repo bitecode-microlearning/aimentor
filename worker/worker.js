@@ -1,6 +1,6 @@
 const DEFAULT_MIN_AVAILABLE_TOKENS = 2000;
 const TOKEN_UNAVAILABLE_ERROR =
-  "Kifogytunk a tokenből, ezért ez a szolgáltatás most nem elérhető. Ha szeretnéd használni, és van rá kapacitásod, támogasd a rendszert a Buy Me a Coffee-n: https://buymeacoffee.com/bitecode. Ezzel segítesz, hogy a rendszer reklámmentes és ingyenes maradjon, és több elérhető tokenje legyen a közösségnek.";
+  "We have run out of available tokens, so this service is currently unavailable. If you would like to use it and have the capacity to help, please support the system on Buy Me a Coffee: https://buymeacoffee.com/bitecode. Your support helps keep the system ad-free and free to use, and gives the community more available tokens.";
 
 function jsonResponse(body, status, headers) {
   return new Response(JSON.stringify(body), {
@@ -186,7 +186,7 @@ export default {
       } catch (err) {
         return jsonResponse(
           {
-            error: `Nem sikerült ellenőrizni az elérhető token keretet: ${err.message}`,
+            error: `Unable to check token availability: ${err.message}`,
             details: err.message,
           },
           502,

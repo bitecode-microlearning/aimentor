@@ -8,7 +8,7 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { MessageSquare, Volume2 } from "lucide-react";
+import { Coffee, MessageSquare, Volume2 } from "lucide-react";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -27,6 +27,8 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
+const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
+
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
@@ -49,6 +51,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
+  const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
   const [mentorVideo] = useState(pickRandomMentorVideo);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
@@ -279,6 +282,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (mentorSessionState === "connecting" || isSessionActive) return;
 
     setErrorMessage(null);
+    setIsTokenSupportScreenVisible(false);
     setControlState("connecting");
     setIsMicMuted(true);
     sessionStartedAtRef.current = Date.now();
@@ -301,6 +305,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.signed_url) {
+        if (data?.code === "TOKEN_LIMIT_EXCEEDED") {
+          setErrorMessage(null);
+          resetSessionState("error");
+          setIsTokenSupportScreenVisible(true);
+          return;
+        }
+
         if (typeof data?.error === "string" && data.error.trim()) {
           throw new Error(data.error);
         }
@@ -433,7 +444,38 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
-      {(isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
+      {isTokenSupportScreenVisible && (
+        <div className="absolute inset-0 z-30 flex items-end bg-[#F6F6F6] px-6 pb-8 pt-8 sm:items-center sm:px-10">
+          <div className="mx-auto flex w-full max-w-md flex-col gap-5 text-[#202124]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FFF3C4] text-[#7A4D00]">
+              <Coffee size={24} aria-hidden="true" />
+            </div>
+            <div className="space-y-3">
+              <h2 className="text-2xl font-semibold leading-tight">The mentor is taking a short break</h2>
+              <p className="text-sm leading-6 text-[#4A4F55]">
+                The shared ElevenLabs token budget is currently too low to start a new AI mentor session. This limit
+                protects the free community service from running past its available monthly quota.
+              </p>
+              <p className="text-sm leading-6 text-[#4A4F55]">
+                BiteCode stays free and ad-free thanks to community support. A small contribution helps add more
+                available mentor tokens for everyone.
+              </p>
+            </div>
+            <Button
+              asChild
+              size="lg"
+              className="w-full rounded-full bg-[#00CE8D] text-white shadow-xl hover:bg-[#00b87d] sm:w-fit"
+            >
+              <a href={BUY_ME_A_COFFEE_URL} target="_blank" rel="noreferrer">
+                <Coffee size={18} />
+                Support BiteCode
+              </a>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!isTokenSupportScreenVisible && (isSessionActive || mentorSessionState === "disconnected" || mentorSessionState === "error") && (
         <div
           className="mentor-status-bar"
           title={lastMentorMessage || undefined}
@@ -467,7 +509,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
 
-      {mentorSessionState === "idle" && (
+      {!isTokenSupportScreenVisible && mentorSessionState === "idle" && (
         <div className="absolute bottom-4 right-4 z-10">
           <Button
             type="button"
@@ -483,7 +525,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
 
-      {(mentorSessionState === "disconnected" || mentorSessionState === "error") && (
+      {!isTokenSupportScreenVisible && (mentorSessionState === "disconnected" || mentorSessionState === "error") && (
         <div className="absolute bottom-4 right-4 z-10">
           <Button
             type="button"
@@ -499,15 +541,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
 
-      <MentorControlBar
-        state={mentorSessionState}
-        isMicMuted={isMicMuted}
-        isBusy={isActionBusy}
-        onMuteToggle={handleMuteToggle}
-        onDone={handleDone}
-        onCancelAsk={handleCancelAsk}
-        onEndSession={handleEndConversation}
-      />
+      {!isTokenSupportScreenVisible && (
+        <MentorControlBar
+          state={mentorSessionState}
+          isMicMuted={isMicMuted}
+          isBusy={isActionBusy}
+          onMuteToggle={handleMuteToggle}
+          onDone={handleDone}
+          onCancelAsk={handleCancelAsk}
+          onEndSession={handleEndConversation}
+        />
+      )}
     </div>
   );
 };
