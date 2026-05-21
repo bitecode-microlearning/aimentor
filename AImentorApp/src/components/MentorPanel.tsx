@@ -8,7 +8,7 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { MessageSquare, Volume2 } from "lucide-react";
+import { Coffee, MessageSquare, Volume2 } from "lucide-react";
 import buyMeACoffeeCup from "./img/buymeacoffee-cup.gif";
 
 interface MentorPanelProps {
@@ -492,15 +492,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
       {isTokenSupportScreenVisible && (
-        <div className="absolute inset-0 z-30 flex items-end bg-[#F6F6F6] px-7 pb-10 pt-10 sm:items-center sm:px-12">
-          <div className="mx-auto flex w-full max-w-lg flex-col gap-7 text-[#202124]">
-            <img
-              src={buyMeACoffeeCup}
-              alt=""
-              aria-hidden="true"
-              className="h-14 w-14 rounded-md object-contain"
-            />
-            <div className="space-y-5">
+        <div className="absolute inset-0 z-30 overflow-y-auto bg-[#F6F6F6] px-7 py-8 sm:px-12">
+          <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center gap-7 text-[#202124]">
+            <div className="flex justify-center">
+              <img
+                src={buyMeACoffeeCup}
+                alt=""
+                aria-hidden="true"
+                className="block h-40 w-40 rounded-lg object-contain sm:h-48 sm:w-48"
+              />
+            </div>
+            <div className="space-y-5 text-left">
               <h2 className="text-3xl font-semibold leading-tight">The mentor is taking a short break</h2>
               <p className="text-base leading-7 text-[#4A4F55]">
                 The shared ElevenLabs token budget is currently too low to start a new AI mentor session. This limit
@@ -522,7 +524,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               className="w-full rounded-full bg-[#00CE8D] text-white shadow-xl hover:bg-[#00b87d] sm:w-fit"
             >
               <a href={BUY_ME_A_COFFEE_URL} target="_blank" rel="noreferrer">
-                <img src={buyMeACoffeeCup} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                <Coffee size={18} />
                 Support BiteCode
               </a>
             </Button>
