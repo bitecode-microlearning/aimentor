@@ -19,6 +19,10 @@ function getMinimumAvailableTokens(env) {
   return configuredLimit;
 }
 
+function isDebugMode(env) {
+  return String(env.DEBUG_MODE ?? "") === "1";
+}
+
 async function getElevenLabsSubscription(env) {
   const subscription = await fetchElevenLabsJson("https://api.elevenlabs.io/v1/user/subscription", env);
 
@@ -81,7 +85,7 @@ function getElevenLabsErrorMessage(data, status) {
   return `ElevenLabs API returned HTTP ${status}`;
 }
 
-async function ensureEnoughAvailableTokens(env, corsHeaders) {
+async function getTokenAvailability(env) {
   const subscription = await getElevenLabsSubscription(env);
   const characterLimit = Number(subscription?.character_limit);
   const characterCount = Number(subscription?.character_count);
@@ -93,20 +97,60 @@ async function ensureEnoughAvailableTokens(env, corsHeaders) {
 
   const availableTokens = characterLimit - characterCount;
 
-  if (availableTokens < minimumAvailableTokens) {
+  return {
+    availableTokens,
+    characterCount,
+    characterLimit,
+    minimumAvailableTokens,
+    configuredMinimumAvailableTokens: env.MIN_AVAILABLE_TOKENS ?? env.TOKEN_LIMIT ?? null,
+  };
+}
+
+function buildDebugPayload(env, tokenAvailability) {
+  if (!isDebugMode(env)) {
+    return undefined;
+  }
+
+  return {
+    debugMode: true,
+    tokenAvailability,
+  };
+}
+
+function withDebugPayload(body, env, tokenAvailability) {
+  const debug = buildDebugPayload(env, tokenAvailability);
+
+  if (!debug) {
+    return body;
+  }
+
+  return {
+    ...body,
+    debug,
+  };
+}
+
+async function ensureEnoughAvailableTokens(env, corsHeaders) {
+  const tokenAvailability = await getTokenAvailability(env);
+
+  if (tokenAvailability.availableTokens < tokenAvailability.minimumAvailableTokens) {
     return jsonResponse(
-      {
-        error: TOKEN_UNAVAILABLE_ERROR,
-        code: "TOKEN_LIMIT_EXCEEDED",
-        availableTokens,
-        minimumAvailableTokens,
-      },
+      withDebugPayload(
+        {
+          error: TOKEN_UNAVAILABLE_ERROR,
+          code: "TOKEN_LIMIT_EXCEEDED",
+          availableTokens: tokenAvailability.availableTokens,
+          minimumAvailableTokens: tokenAvailability.minimumAvailableTokens,
+        },
+        env,
+        tokenAvailability
+      ),
       503,
       corsHeaders
     );
   }
 
-  return null;
+  return { tokenAvailability };
 }
 
 export default {
@@ -177,12 +221,16 @@ export default {
 
     // --- 🔹 1. ElevenLabs agent endpoint ---
     if (pathname === "/agent") {
-      try {
-        const tokenLimitResponse = await ensureEnoughAvailableTokens(env, corsHeaders);
+      let tokenAvailability;
 
-        if (tokenLimitResponse) {
-          return tokenLimitResponse;
+      try {
+        const tokenLimitResult = await ensureEnoughAvailableTokens(env, corsHeaders);
+
+        if (tokenLimitResult instanceof Response) {
+          return tokenLimitResult;
         }
+
+        tokenAvailability = tokenLimitResult.tokenAvailability;
       } catch (err) {
         return jsonResponse(
           {
@@ -202,10 +250,25 @@ export default {
       });
 
       const text = await res.text();
-      return new Response(text, {
-        status: res.status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      let data = null;
+
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch (err) {
+        return jsonResponse(
+          withDebugPayload(
+            {
+              error: `Unable to parse signed session response: ${err.message}`,
+            },
+            env,
+            tokenAvailability
+          ),
+          502,
+          corsHeaders
+        );
+      }
+
+      return jsonResponse(withDebugPayload(data, env, tokenAvailability), res.status, corsHeaders);
     }
 
     // --- 🔹 2. Lesson endpoint with HMAC + 30-day expiry ---

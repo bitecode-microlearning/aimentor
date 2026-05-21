@@ -5,10 +5,13 @@ compatibility_date = "2025-10-19"
 [vars]
 # Minimum remaining ElevenLabs token/character budget required before creating a mentor session.
 MIN_AVAILABLE_TOKENS = "2000"
+DEBUG_MODE = "0"
 
 [env.production]
 # Add production secrets in Cloudflare dashboard.
-# Override MIN_AVAILABLE_TOKENS there if production needs a different threshold.
+# Production deploys use [env.production.vars], so update the values below or
+# override them in the Cloudflare dashboard when testing token limits.
 
 [env.production.vars]
 MIN_AVAILABLE_TOKENS = "2000"
+DEBUG_MODE = "0"

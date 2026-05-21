@@ -26,6 +26,14 @@ type ConversationInstance = {
   sendUserActivity?: () => Promise<void> | void;
 };
 
+type TokenAvailabilityDebug = {
+  availableTokens?: number;
+  characterCount?: number;
+  characterLimit?: number;
+  minimumAvailableTokens?: number;
+  configuredMinimumAvailableTokens?: string | number | null;
+};
+
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
 
@@ -36,6 +44,29 @@ const mentorVideos = Object.entries(
   .map(([, videoUrl]) => videoUrl as string);
 
 const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
+
+const formatTokenCount = (value: unknown) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "unknown";
+  }
+
+  return new Intl.NumberFormat("en-US").format(value);
+};
+
+const getTokenDebugMessage = (data: any) => {
+  const tokenAvailability = data?.debug?.tokenAvailability as TokenAvailabilityDebug | undefined;
+
+  if (!data?.debug?.debugMode || !tokenAvailability) {
+    return "";
+  }
+
+  return [
+    `Token availability checked: ${formatTokenCount(tokenAvailability.availableTokens)} available`,
+    `minimum required ${formatTokenCount(tokenAvailability.minimumAvailableTokens)}`,
+    `used ${formatTokenCount(tokenAvailability.characterCount)} of ${formatTokenCount(tokenAvailability.characterLimit)}`,
+    `configured limit ${String(tokenAvailability.configuredMinimumAvailableTokens ?? "default")}`,
+  ].join(", ");
+};
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
   userfirstname,
@@ -52,6 +83,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
   const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
+  const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
+  const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
   const [mentorVideo] = useState(pickRandomMentorVideo);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
@@ -126,6 +159,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setIsMicMuted(true);
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
+    setConnectionStatusMessage("");
     sessionStartedAtRef.current = null;
     clearProgressTimer();
     setSessionProgress(0);
@@ -283,10 +317,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
+    setTokenSupportDebugMessage("");
     setControlState("connecting");
     setIsMicMuted(true);
     sessionStartedAtRef.current = Date.now();
     setSessionProgress(0);
+    setConnectionStatusMessage("Loading mentor configuration...");
 
     try {
       let WORKER_AGENT_URL: string | undefined;
@@ -301,12 +337,21 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         throw new Error("Missing WORKER_AGENT_URL in src/config/workerConfig.ts");
       }
 
+      setConnectionStatusMessage("Checking token availability and requesting a signed mentor session...");
       const res = await fetch(WORKER_AGENT_URL);
       const data = await res.json().catch(() => null);
+      const tokenDebugMessage = getTokenDebugMessage(data);
+
+      if (tokenDebugMessage) {
+        setConnectionStatusMessage(`${tokenDebugMessage}. Starting ElevenLabs session...`);
+      } else {
+        setConnectionStatusMessage("Starting ElevenLabs session...");
+      }
 
       if (!res.ok || !data?.signed_url) {
         if (data?.code === "TOKEN_LIMIT_EXCEEDED") {
           setErrorMessage(null);
+          setTokenSupportDebugMessage(tokenDebugMessage);
           resetSessionState("error");
           setIsTokenSupportScreenVisible(true);
           return;
@@ -360,6 +405,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       conversationRef.current = convo as ConversationInstance;
       setMicrophoneMuted(true);
+      setConnectionStatusMessage("");
       debugMentorControls("dynamic variables sent", { userfirstname, coursename, lessonname, knowledgelevel });
     } catch (error) {
       setErrorMessage(getReadableError(error));
@@ -460,6 +506,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
                 BiteCode stays free and ad-free thanks to community support. A small contribution helps add more
                 available mentor tokens for everyone.
               </p>
+              {tokenSupportDebugMessage && (
+                <p className="rounded-md bg-white/70 px-3 py-2 text-xs leading-5 text-[#5F6368]">
+                  {tokenSupportDebugMessage}
+                </p>
+              )}
             </div>
             <Button
               asChild
@@ -488,6 +539,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
                 <span>You muted manually. The app will wait until the next mentor question.</span>
               )}
+              {mentorSessionState === "connecting" && connectionStatusMessage && <span>{connectionStatusMessage}</span>}
               {errorMessage && <strong>{errorMessage}</strong>}
             </div>
           </div>
