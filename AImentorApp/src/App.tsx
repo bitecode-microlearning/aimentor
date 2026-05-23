@@ -11,6 +11,11 @@ function App() {
   const [lessonData, setLessonData] = useState<{
     courseName: string;
     lessonName: string;
+    userfirstname?: string;
+    knowledgelevel?: string;
+    content?: string;
+    signedData?: string;
+    signedSig?: string;
     sections: Array<{ title: string; content: string; type?: "text" | "code" | "tip" }>;
   }>({
     courseName: "Loading...",
@@ -72,6 +77,8 @@ function App() {
           userfirstname: json.userfirstname || "Unknown User",
           knowledgelevel: json.knowledgelevel || "Beginner",
           content: json.content || "<p>No content available.</p>",
+          signedData: data,
+          signedSig: sig,
 
           sections: [
             {
@@ -118,6 +125,8 @@ function App() {
                   lessonname={lessonData.lessonName}
                   content={lessonData.content}
                   knowledgelevel={lessonData.knowledgelevel}
+                  signedData={lessonData.signedData}
+                  signedSig={lessonData.signedSig}
                 />
               </div>
             </div>

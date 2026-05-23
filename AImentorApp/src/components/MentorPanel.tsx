@@ -16,6 +16,8 @@ interface MentorPanelProps {
   lessonname?: string;
   content?: string;
   knowledgelevel?: string;
+  signedData?: string;
+  signedSig?: string;
 }
 
 type ConversationInstance = {
@@ -27,6 +29,8 @@ type ConversationInstance = {
 };
 
 const ESTIMATED_SESSION_SECONDS = 5 * 60;
+const USAGE_REGISTRATION_DELAY_MS = 60 * 1000;
+const USAGE_REGISTRATION_RETRY_DELAYS_MS = [10 * 1000, 30 * 1000, 60 * 1000];
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
@@ -41,6 +45,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   lessonname,
   content,
   knowledgelevel,
+  signedData,
+  signedSig,
 }) => {
   const [mentorSessionState, setMentorSessionState] = useState<MentorControlState>("idle");
   const [isMicMuted, setIsMicMuted] = useState(true);
@@ -54,7 +60,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
+  const usageRegistrationTimerRef = useRef<number | null>(null);
   const sessionStartedAtRef = useRef<number | null>(null);
+  const usageRegistrationStartedRef = useRef(false);
   const stateRef = useRef<MentorControlState>("idle");
   const userManuallyMutedRef = useRef(false);
   const lastMentorMessageRef = useRef("");
@@ -83,6 +91,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (progressTimerRef.current !== null) {
       window.clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
+    }
+  };
+
+  const clearUsageRegistrationTimer = () => {
+    if (usageRegistrationTimerRef.current !== null) {
+      window.clearTimeout(usageRegistrationTimerRef.current);
+      usageRegistrationTimerRef.current = null;
     }
   };
 
@@ -124,7 +139,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
     sessionStartedAtRef.current = null;
+    usageRegistrationStartedRef.current = false;
     clearProgressTimer();
+    clearUsageRegistrationTimer();
     setSessionProgress(0);
     setIsActionBusy(false);
     setControlState(nextState);
@@ -246,6 +263,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return () => {
       clearPendingUnmute();
       clearProgressTimer();
+      clearUsageRegistrationTimer();
       conversationRef.current?.endSession?.();
       conversationRef.current = null;
     };
@@ -275,6 +293,41 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return clearProgressTimer;
   }, [isSessionActive]);
 
+  const registerAIMentorUsage = async (usageUrl: string) => {
+    if (!signedData || !signedSig) {
+      debugMentorControls("usage registration skipped: missing signed lesson payload");
+      return;
+    }
+
+    const requestBody = JSON.stringify({ data: signedData, sig: signedSig });
+    const retryDelays = [0, ...USAGE_REGISTRATION_RETRY_DELAYS_MS];
+
+    for (let attemptIndex = 0; attemptIndex < retryDelays.length; attemptIndex += 1) {
+      if (retryDelays[attemptIndex] > 0) {
+        await new Promise((resolve) => {
+          usageRegistrationTimerRef.current = window.setTimeout(() => resolve(undefined), retryDelays[attemptIndex]);
+        });
+      }
+
+      try {
+        const res = await fetch(usageUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+        });
+
+        if (res.ok) {
+          debugMentorControls("usage registered");
+          return;
+        }
+
+        debugMentorControls("usage registration failed", { status: res.status });
+      } catch (error) {
+        debugMentorControls("usage registration request failed", error);
+      }
+    }
+  };
+
   const handleStartConversation = async () => {
     if (mentorSessionState === "connecting" || isSessionActive) return;
 
@@ -297,11 +350,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         throw new Error("Missing WORKER_AGENT_URL in src/config/workerConfig.ts");
       }
 
-      const res = await fetch(WORKER_AGENT_URL);
+      if (!signedData || !signedSig) {
+        throw new Error("Missing signed lesson data. Please reopen the lesson from your course email.");
+      }
+
+      const res = await fetch(WORKER_AGENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: signedData, sig: signedSig }),
+      });
       const data = await res.json();
 
       if (!res.ok || !data.signed_url) {
-        throw new Error("Unable to get a signed mentor session. Please try again later.");
+        throw new Error(data?.error || "Unable to get a signed mentor session. Please try again later.");
       }
 
       const convo = await Conversation.startSession({
@@ -345,6 +406,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       conversationRef.current = convo as ConversationInstance;
       setMicrophoneMuted(true);
+      if (!usageRegistrationStartedRef.current) {
+        usageRegistrationStartedRef.current = true;
+        const usageUrl = WORKER_AGENT_URL.replace(/\/agent\/?$/, "/usage");
+        usageRegistrationTimerRef.current = window.setTimeout(() => {
+          registerAIMentorUsage(usageUrl);
+        }, USAGE_REGISTRATION_DELAY_MS);
+      }
       debugMentorControls("dynamic variables sent", { userfirstname, coursename, lessonname, knowledgelevel });
     } catch (error) {
       setErrorMessage(getReadableError(error));
