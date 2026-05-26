@@ -2205,7 +2205,7 @@ html {
   display: block !important;
   width: 100% !important;
   min-height: 46px !important;
-  padding: 10px 16px 12px !important;
+  padding: 10px 104px 12px 16px !important;
   overflow: hidden !important;
   color: #fff !important;
   background: rgba(64, 72, 89, .52) !important;
@@ -2273,6 +2273,32 @@ html {
   color: #fee2e2 !important;
   font-size: 13px !important;
   font-weight: 600 !important;
+}
+
+.mentor-session-timer {
+  position: absolute !important;
+  top: 8px !important;
+  right: 12px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-width: 74px !important;
+  height: 30px !important;
+  padding: 0 10px !important;
+  color: #fff !important;
+  background: rgba(19, 118, 200, .88) !important;
+  border: 1px solid rgba(255, 255, 255, .32) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .18) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+.mentor-session-timer svg {
+  flex: 0 0 auto !important;
 }
 
 .mentor-status-progress {

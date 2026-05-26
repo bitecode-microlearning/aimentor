@@ -8,7 +8,7 @@ import {
   isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
-import { Coffee, MessageSquare, Volume2 } from "lucide-react";
+import { Clock, Coffee, MessageSquare, Volume2 } from "lucide-react";
 import buyMeACoffeeCup from "./img/buymeacoffee-cup.gif";
 
 interface MentorPanelProps {
@@ -37,7 +37,7 @@ type TokenAvailabilityDebug = {
   configuredMinimumAvailableTokens?: string | number | null;
 };
 
-const ESTIMATED_SESSION_SECONDS = 5 * 60;
+const ESTIMATED_SESSION_SECONDS = 480;
 const USAGE_REGISTRATION_DELAY_MS = 60 * 1000;
 const USAGE_REGISTRATION_RETRY_DELAYS_MS = [10 * 1000, 30 * 1000, 60 * 1000];
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
@@ -55,6 +55,14 @@ const formatTokenCount = (value: unknown) => {
   }
 
   return new Intl.NumberFormat("en-US").format(value);
+};
+
+const formatElapsedTime = (elapsedSeconds: number) => {
+  const safeElapsedSeconds = Math.max(0, Math.floor(elapsedSeconds));
+  const minutes = Math.floor(safeElapsedSeconds / 60);
+  const seconds = safeElapsedSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
 const getTokenDebugMessage = (data: any) => {
@@ -88,6 +96,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
   const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
@@ -180,6 +189,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     clearProgressTimer();
     clearUsageRegistrationTimer();
     setSessionProgress(0);
+    setSessionElapsedSeconds(0);
     setIsActionBusy(false);
     setControlState(nextState);
   };
@@ -321,6 +331,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       const elapsedSeconds = (Date.now() - startedAt) / 1000;
       const nextProgress = Math.min(100, (elapsedSeconds / ESTIMATED_SESSION_SECONDS) * 100);
       setSessionProgress(nextProgress);
+      setSessionElapsedSeconds(Math.floor(elapsedSeconds));
     };
 
     updateProgress();
@@ -375,6 +386,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setIsMicMuted(true);
     sessionStartedAtRef.current = Date.now();
     setSessionProgress(0);
+    setSessionElapsedSeconds(0);
     setConnectionStatusMessage("Loading mentor configuration...");
 
     try {
@@ -618,6 +630,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               {errorMessage && <strong>{errorMessage}</strong>}
             </div>
           </div>
+          {isSessionActive && (
+            <div className="mentor-session-timer" aria-label="Elapsed lesson time">
+              <Clock size={15} aria-hidden="true" />
+              <span>{formatElapsedTime(sessionElapsedSeconds)}</span>
+            </div>
+          )}
           <div
             className="mentor-status-progress mentor-status-progress-bottom"
             role="progressbar"
