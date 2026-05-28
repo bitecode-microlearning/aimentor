@@ -97,6 +97,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [isActionBusy, setIsActionBusy] = useState(false);
   const [sessionProgress, setSessionProgress] = useState(0);
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
+  const [hasElevenLabsSessionStarted, setHasElevenLabsSessionStarted] = useState(false);
   const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
@@ -118,6 +119,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     mentorSessionState !== "idle" &&
     mentorSessionState !== "disconnected" &&
     mentorSessionState !== "error";
+  const isLessonTimerActive = isSessionActive && hasElevenLabsSessionStarted;
 
   const setControlState = (nextState: MentorControlState) => {
     debugMentorControls("state change", { from: stateRef.current, to: nextState });
@@ -190,6 +192,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     clearUsageRegistrationTimer();
     setSessionProgress(0);
     setSessionElapsedSeconds(0);
+    setHasElevenLabsSessionStarted(false);
     setIsActionBusy(false);
     setControlState(nextState);
   };
@@ -317,7 +320,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isSessionActive) {
+    if (!isLessonTimerActive) {
       clearProgressTimer();
       return;
     }
@@ -339,7 +342,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     progressTimerRef.current = window.setInterval(updateProgress, 1000);
 
     return clearProgressTimer;
-  }, [isSessionActive]);
+  }, [isLessonTimerActive]);
 
   const registerAIMentorUsage = async (usageUrl: string) => {
     if (!signedData || !signedSig) {
@@ -384,9 +387,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setTokenSupportDebugMessage("");
     setControlState("connecting");
     setIsMicMuted(true);
-    sessionStartedAtRef.current = Date.now();
+    sessionStartedAtRef.current = null;
     setSessionProgress(0);
     setSessionElapsedSeconds(0);
+    setHasElevenLabsSessionStarted(false);
     setConnectionStatusMessage("Loading mentor configuration...");
 
     try {
@@ -449,6 +453,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         },
         onConnect: () => {
           debugMentorControls("session connected");
+          sessionStartedAtRef.current = Date.now();
+          setSessionProgress(0);
+          setSessionElapsedSeconds(0);
+          setHasElevenLabsSessionStarted(true);
         },
         onDisconnect: () => {
           debugMentorControls("session disconnected");
@@ -630,7 +638,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               {errorMessage && <strong>{errorMessage}</strong>}
             </div>
           </div>
-          {isSessionActive && (
+          {isLessonTimerActive && (
             <div className="mentor-session-timer" aria-label="Elapsed lesson time">
               <Clock size={15} aria-hidden="true" />
               <span>{formatElapsedTime(sessionElapsedSeconds)}</span>
