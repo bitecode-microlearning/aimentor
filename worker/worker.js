@@ -238,7 +238,7 @@ async function validateSignedLessonPayload(encoded, signature, env) {
   return { lessonData };
 }
 
-function getRetoolExpiresAt(lessonData) {
+function getUsageExpiresAt(lessonData) {
   if (lessonData.expiresat) return lessonData.expiresat;
   if (lessonData.expiresAt) return lessonData.expiresAt;
 
@@ -250,7 +250,7 @@ function getRetoolExpiresAt(lessonData) {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 }
 
-async function callAIMentorUsageWorkflow(action, lessonData, env) {
+function validateUsageRequest(action, lessonData) {
   const subscriptionid = Number(lessonData.subscriptionid);
 
   if (!Number.isInteger(subscriptionid) || subscriptionid <= 0) {
@@ -262,33 +262,88 @@ async function callAIMentorUsageWorkflow(action, lessonData, env) {
     };
   }
 
-  const res = await fetch(env.RETOOL_WORKFLOW_URL_AIMENTORHANDLER, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Workflow-Api-Key": env.RETOOL_WORKFLOW_SECRET_AIMENTORHANDLER,
-    },
-    body: JSON.stringify({
-      action,
-      subscriptionid,
-      expiresat: getRetoolExpiresAt(lessonData),
-      nonce: lessonData.nonce || crypto.randomUUID(),
-      testmode: lessonData.testmode || "false",
-    }),
-  });
+  if (!["check_aimentor_usage", "update_aimentor_usage"].includes(action)) {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: "invalid input data" },
+    };
+  }
 
-  const text = await res.text();
-  let body = {};
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { message: text };
+  const expiresAt = new Date(getUsageExpiresAt(lessonData));
+
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() <= Date.now()) {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: "invalid input data" },
+    };
+  }
+
+  return { ok: true, subscriptionid };
+}
+
+async function handleAIMentorUsage(action, lessonData, env) {
+  const validation = validateUsageRequest(action, lessonData);
+
+  if (!validation.ok) return validation;
+
+  const subscription = await env.DB.prepare(
+    `SELECT
+       u.id AS userid,
+       s.id AS subscriptionid,
+       s.status AS subscriptionstatus,
+       u.status AS userstatus,
+       u.lastaimentorusage AS lastaimentorusage
+     FROM subscriptions s
+     INNER JOIN users u ON u.id = s.userid
+     WHERE s.id = ?`
+  ).bind(validation.subscriptionid).first();
+
+  if (!subscription) {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: "subscription cannot be found" },
+    };
+  }
+
+  if (subscription.userstatus !== "active") {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: "Inactive subscription or user" },
+    };
+  }
+
+  if (
+    subscription.lastaimentorusage &&
+    String(subscription.lastaimentorusage).slice(0, 10) === new Date().toISOString().slice(0, 10)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      body: { success: false, error: "AI mentor session is already used" },
+    };
+  }
+
+  if (action === "update_aimentor_usage") {
+    await env.DB.prepare(
+      `UPDATE users
+       SET lastaimentorusage = date('now')
+       WHERE id = ?`
+    ).bind(subscription.userid).run();
   }
 
   return {
-    ok: res.ok,
-    status: res.status,
-    body,
+    ok: true,
+    status: 200,
+    body: {
+      success: true,
+      message: action === "update_aimentor_usage"
+        ? "AI mentor session usage updated"
+        : "AI mentor session is ready to use",
+    },
   };
 }
 
@@ -358,8 +413,7 @@ export default {
     if (pathname === "/agent" || pathname === "/usage") {
       const requiredEnv = [
         "HMAC_SECRET",
-        "RETOOL_WORKFLOW_URL_AIMENTORHANDLER",
-        "RETOOL_WORKFLOW_SECRET_AIMENTORHANDLER",
+        "DB",
       ];
 
       if (pathname === "/agent") {
@@ -378,7 +432,7 @@ export default {
         }
 
         const action = pathname === "/agent" ? "check_aimentor_usage" : "update_aimentor_usage";
-        const usageResult = await callAIMentorUsageWorkflow(action, result.lessonData, env);
+        const usageResult = await handleAIMentorUsage(action, result.lessonData, env);
 
         if (!usageResult.ok) {
           if (usageResult.isLocalValidationError) {

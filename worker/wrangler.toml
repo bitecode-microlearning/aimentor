@@ -7,13 +7,21 @@ compatibility_date = "2025-10-19"
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "bitecode-sitedb-dev"
+database_id = "8c1c6e59-a9da-4e78-b283-c7856fffcc29"
+
 [env.production]
 # Add production secrets in Cloudflare dashboard.
 # Production deploys use [env.production.vars], so update the values below or
 # override them in the Cloudflare dashboard when testing token limits.
 
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "bitecode-sitedb-prod"
+database_id = "0581ff0d-930a-42a6-b9c5-45b74a974a8d"
+
 [env.production.vars]
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
-RETOOL_WORKFLOW_URL_AIMENTORHANDLER = ""
-RETOOL_WORKFLOW_SECRET_AIMENTORHANDLER = ""
