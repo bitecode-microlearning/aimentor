@@ -250,6 +250,15 @@ function getUsageExpiresAt(lessonData) {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 }
 
+function withMentorBootstrapMode(body, env) {
+  return {
+    ...body,
+    mentor_context_mode: String(env.MENTOR_ID_ONLY_BOOTSTRAP_ENABLED ?? "").toLowerCase() === "true"
+      ? "id_only"
+      : "legacy_content",
+  };
+}
+
 function validateUsageRequest(action, lessonData) {
   const subscriptionid = Number(lessonData.subscriptionid);
 
@@ -512,7 +521,11 @@ export default {
           );
         }
 
-        return jsonResponse(withDebugPayload(data, env, tokenAvailability), res.status, corsHeaders);
+        return jsonResponse(
+          withMentorBootstrapMode(withDebugPayload(data, env, tokenAvailability), env),
+          res.status,
+          corsHeaders
+        );
       } catch (err) {
         return jsonResponse(
           {

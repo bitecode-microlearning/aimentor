@@ -14,6 +14,10 @@ function App() {
     userfirstname?: string;
     knowledgelevel?: string;
     mentorSessionId?: string;
+    userId?: string;
+    subscriptionId?: string;
+    courseId?: string;
+    lessonId?: string;
     content?: string;
     signedData?: string;
     signedSig?: string;
@@ -78,6 +82,10 @@ function App() {
           userfirstname: json.userfirstname || "Unknown User",
           knowledgelevel: json.knowledgelevel || "Beginner",
           mentorSessionId: json.mentor_session_id || json.mentorSessionId,
+          userId: String(json.userid || json.user_id || json.userId || ""),
+          subscriptionId: String(json.subscriptionid || json.subscription_id || json.subscriptionId || ""),
+          courseId: String(json.courseid || json.course_id || json.courseId || ""),
+          lessonId: String(json.lessonid || json.lesson_id || json.lessonId || ""),
           content: json.content || "<p>No content available.</p>",
           signedData: data,
           signedSig: sig,
@@ -128,6 +136,10 @@ function App() {
                   content={lessonData.content}
                   knowledgelevel={lessonData.knowledgelevel}
                   mentorSessionId={lessonData.mentorSessionId}
+                  userId={lessonData.userId}
+                  subscriptionId={lessonData.subscriptionId}
+                  courseId={lessonData.courseId}
+                  lessonId={lessonData.lessonId}
                   signedData={lessonData.signedData}
                   signedSig={lessonData.signedSig}
                 />

@@ -18,6 +18,10 @@ interface MentorPanelProps {
   content?: string;
   knowledgelevel?: string;
   mentorSessionId?: string;
+  userId?: string;
+  subscriptionId?: string;
+  courseId?: string;
+  lessonId?: string;
   signedData?: string;
   signedSig?: string;
 }
@@ -88,6 +92,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   content,
   knowledgelevel,
   mentorSessionId,
+  userId,
+  subscriptionId,
+  courseId,
+  lessonId,
   signedData,
   signedSig,
 }) => {
@@ -443,17 +451,33 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         throw new Error("Unable to get a signed mentor session. Please try again later.");
       }
 
+      const idOnlyBootstrap = data?.mentor_context_mode === "id_only";
+      if (idOnlyBootstrap && (!userId || !subscriptionId || !courseId || !lessonId || !mentorSessionId)) {
+        throw new Error("This lesson link is missing AI Mentor context IDs. Please open the latest lesson link from your course email.");
+      }
+
+      const dynamicVariables = idOnlyBootstrap
+        ? {
+            user_id: userId!,
+            subscription_id: subscriptionId!,
+            course_id: courseId!,
+            lesson_id: lessonId!,
+            mentor_session_id: mentorSessionId!,
+            userfirstname: userfirstname || "User",
+          }
+        : {
+            userfirstname: userfirstname || "User",
+            coursename: coursename || "Unknown Course",
+            lessonname: lessonname || "Untitled Lesson",
+            knowledgelevel: knowledgelevel || "beginner",
+            content: content || "",
+            ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
+          };
+
       const convo = await Conversation.startSession({
         signedUrl: data.signed_url,
         connectionType: "websocket",
-        dynamicVariables: {
-          userfirstname: userfirstname || "User",
-          coursename: coursename || "Unknown Course",
-          lessonname: lessonname || "Untitled Lesson",
-          knowledgelevel: knowledgelevel || "beginner",
-          content: content || "",
-          ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
-        },
+        dynamicVariables,
         onConnect: () => {
           debugMentorControls("session connected");
           sessionStartedAtRef.current = Date.now();

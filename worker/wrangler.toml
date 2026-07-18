@@ -6,6 +6,7 @@ compatibility_date = "2025-10-19"
 # Minimum remaining ElevenLabs token/character budget required before creating a mentor session.
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
+MENTOR_ID_ONLY_BOOTSTRAP_ENABLED = "false"
 
 [[d1_databases]]
 binding = "DB"
@@ -25,3 +26,4 @@ database_id = "0581ff0d-930a-42a6-b9c5-45b74a974a8d"
 [env.production.vars]
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
+MENTOR_ID_ONLY_BOOTSTRAP_ENABLED = "false"
