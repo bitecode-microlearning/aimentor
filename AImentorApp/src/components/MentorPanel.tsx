@@ -17,6 +17,7 @@ interface MentorPanelProps {
   lessonname?: string;
   content?: string;
   knowledgelevel?: string;
+  mentorSessionId?: string;
   signedData?: string;
   signedSig?: string;
 }
@@ -86,6 +87,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   lessonname,
   content,
   knowledgelevel,
+  mentorSessionId,
   signedData,
   signedSig,
 }) => {
@@ -450,6 +452,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           lessonname: lessonname || "Untitled Lesson",
           knowledgelevel: knowledgelevel || "beginner",
           content: content || "",
+          ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
         },
         onConnect: () => {
           debugMentorControls("session connected");

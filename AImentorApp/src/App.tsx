@@ -13,6 +13,7 @@ function App() {
     lessonName: string;
     userfirstname?: string;
     knowledgelevel?: string;
+    mentorSessionId?: string;
     content?: string;
     signedData?: string;
     signedSig?: string;
@@ -76,6 +77,7 @@ function App() {
           lessonName: json.lessonname || "Untitled Lesson",
           userfirstname: json.userfirstname || "Unknown User",
           knowledgelevel: json.knowledgelevel || "Beginner",
+          mentorSessionId: json.mentor_session_id || json.mentorSessionId,
           content: json.content || "<p>No content available.</p>",
           signedData: data,
           signedSig: sig,
@@ -125,6 +127,7 @@ function App() {
                   lessonname={lessonData.lessonName}
                   content={lessonData.content}
                   knowledgelevel={lessonData.knowledgelevel}
+                  mentorSessionId={lessonData.mentorSessionId}
                   signedData={lessonData.signedData}
                   signedSig={lessonData.signedSig}
                 />
