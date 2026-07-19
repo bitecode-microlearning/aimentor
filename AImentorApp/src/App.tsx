@@ -6,6 +6,7 @@ import  MentorPanel from "./components/MentorPanel";
 import { LessonContent } from "./components/LessonContent"; // ✅ named import
 import { Footer } from "./components/Footer";
 import { parseLessonEvaluation, type LessonEvaluation } from "./domain/lessonUnderstanding";
+import type { LessonPresentationSlide } from "./domain/lessonPresentation";
 
 function App() {
   // 🔹 State for lesson data
@@ -46,6 +47,7 @@ function App() {
     evaluation: LessonEvaluation;
     context: "previous" | "current";
   } | null>(null);
+  const [presentationSlide, setPresentationSlide] = useState<LessonPresentationSlide | null>(null);
 
   // 🔹 Load lesson data from Worker when app starts
   useEffect(() => {
@@ -171,6 +173,10 @@ function App() {
                   onLessonEvaluationVisible={(evaluation, context) => {
                     setVisibleLessonEvaluation({ evaluation, context });
                   }}
+                  onLessonPresentationChange={(slide) => {
+                    setPresentationSlide(slide);
+                    if (!slide) setVisibleLessonEvaluation(null);
+                  }}
                 />
               </div>
             </div>
@@ -182,6 +188,7 @@ function App() {
                   lessonName={lessonData.lessonName}
                   sections={lessonData.sections}
                   lessonEvaluation={visibleLessonEvaluation}
+                  presentationSlide={presentationSlide}
                 />
               </div>
             </div>

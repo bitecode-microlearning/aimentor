@@ -1,0 +1,139 @@
+import React from "react";
+import { BookOpen, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, Sparkles } from "lucide-react";
+import type { LessonEvaluation } from "../domain/lessonUnderstanding";
+import type { LessonPresentationSlide } from "../domain/lessonPresentation";
+import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
+
+interface LessonPresentationStageProps {
+  lessonName: string;
+  slide?: LessonPresentationSlide | null;
+  evaluation?: {
+    evaluation: LessonEvaluation;
+    context: "previous" | "current";
+  } | null;
+}
+
+const DONATION_URL = "https://buymeacoffee.com/bitecode";
+
+function SlideList({ items }: { items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <ul className="lesson-stage-list">
+      {items.map((item, index) => (
+        <li key={`${index}-${item}`}><span aria-hidden="true"><ListChecks size={18} /></span><span>{item}</span></li>
+      ))}
+    </ul>
+  );
+}
+
+function CodeWindow({ slide }: { slide: Extract<LessonPresentationSlide, { type: "code" }> }) {
+  const lines = slide.code.replace(/\r\n/g, "\n").split("\n");
+  return (
+    <div className="lesson-stage-code-window">
+      <div className="lesson-stage-code-toolbar">
+        <span className="lesson-stage-window-dots" aria-hidden="true"><i /><i /><i /></span>
+        <span>{slide.title}</span>
+        <span className="lesson-stage-language">{slide.language}</span>
+      </div>
+      <pre aria-label={`${slide.language} code example`}><code>
+        {lines.map((line, index) => (
+          <span className="lesson-stage-code-line" key={index}>
+            <span className="lesson-stage-line-number" aria-hidden="true">{index + 1}</span>
+            <span>{line || " "}</span>
+          </span>
+        ))}
+      </code></pre>
+    </div>
+  );
+}
+
+export function LessonPresentationStage({ lessonName, slide, evaluation }: LessonPresentationStageProps) {
+  const renderEvaluation = (context: "previous" | "current") => evaluation?.context === context && (
+    <LessonUnderstandingStatusCard
+      lessonName={evaluation.evaluation.lessonName}
+      status={evaluation.evaluation.status}
+      context={context}
+      compact={context === "previous"}
+    />
+  );
+
+  if (!slide) {
+    if (evaluation?.context === "previous") {
+      return <div className="lesson-stage lesson-stage-review" aria-live="polite">{renderEvaluation("previous")}</div>;
+    }
+    return (
+      <section className="lesson-stage lesson-stage-intro" aria-labelledby="lesson-stage-intro-title">
+        <div className="lesson-stage-heading"><BookOpen size={26} aria-hidden="true" /><p>Interactive lesson</p></div>
+        <h3 id="lesson-stage-intro-title">Ready when you are</h3>
+        <p>Start the AI mentor session. Key topics, questions, and examples will appear here as the conversation progresses.</p>
+      </section>
+    );
+  }
+
+  if (slide.type === "topic") {
+    return (
+      <section className="lesson-stage lesson-stage-topic" aria-live="polite">
+        <div className="lesson-stage-heading"><BookOpen size={26} aria-hidden="true" /><p>Current topic</p></div>
+        <h3>{slide.title}</h3>
+        <SlideList items={slide.points} />
+      </section>
+    );
+  }
+
+  if (slide.type === "review") {
+    return (
+      <section className="lesson-stage lesson-stage-review" aria-live="polite">
+        <div className="lesson-stage-heading"><ClipboardCheck size={26} aria-hidden="true" /><p>Lesson review</p></div>
+        <h3>{slide.title}</h3>
+        {renderEvaluation("previous")}
+        <SlideList items={slide.topics} />
+      </section>
+    );
+  }
+
+  if (slide.type === "question") {
+    return (
+      <section className="lesson-stage lesson-stage-question" aria-live="polite" aria-label="Mentor question">
+        <div className="lesson-stage-heading"><CircleHelp size={28} aria-hidden="true" /><p>Your question</p></div>
+        <blockquote>{slide.question}</blockquote>
+        {slide.supportingText && <p className="lesson-stage-supporting">{slide.supportingText}</p>}
+      </section>
+    );
+  }
+
+  if (slide.type === "code") {
+    return (
+      <section className="lesson-stage lesson-stage-code" aria-live="polite">
+        <div className="lesson-stage-heading"><Code2 size={26} aria-hidden="true" /><p>Code and data example</p></div>
+        <CodeWindow slide={slide} />
+        {slide.explanation && <p className="lesson-stage-supporting">{slide.explanation}</p>}
+      </section>
+    );
+  }
+
+  if (slide.type === "donation") {
+    return (
+      <section className="lesson-stage lesson-stage-donation" aria-live="polite">
+        <div className="lesson-stage-donation-icon" aria-hidden="true"><Coffee size={38} /></div>
+        <p className="lesson-stage-kicker">Help BiteCode stay independent</p>
+        <h3>Keep BiteCode ad-free</h3>
+        <p>If BiteCode helps you learn, you can support its running costs for about the price of a coffee.</p>
+        <a href={DONATION_URL} target="_blank" rel="noreferrer">Support BiteCode</a>
+        <span className="lesson-stage-url">buymeacoffee.com/bitecode</span>
+      </section>
+    );
+  }
+
+  return (
+    <section className="lesson-stage lesson-stage-summary" aria-live="polite">
+      <div className="lesson-stage-heading"><Sparkles size={28} aria-hidden="true" /><p>Session complete</p></div>
+      <h3>{slide.title || lessonName}</h3>
+      {renderEvaluation("current")}
+      <SlideList items={slide.coveredTopics} />
+      {slide.takeaway && <p className="lesson-stage-takeaway"><strong>Key takeaway:</strong> {slide.takeaway}</p>}
+      <p className="lesson-stage-thanks">{slide.encouragement || "Thanks for taking part in this AI mentor session."}</p>
+    </section>
+  );
+}
+
+export type { LessonPresentationStageProps };

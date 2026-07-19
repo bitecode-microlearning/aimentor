@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "showMentorQuestion",
+  "description": "Display the exact question the mentor is asking so the learner can read it while listening. Call immediately before asking a focused teaching or understanding-check question.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "question", "type": "string", "description": "The exact learner-facing question that will be spoken. Do not paraphrase or add internal instructions.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "supportingText", "type": "string", "description": "Optional short hint or context that does not reveal the answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

@@ -1,0 +1,21 @@
+{
+  "type": "client",
+  "name": "showSessionSummary",
+  "description": "Prepare the final learner-facing session summary slide. Call once in the closing sequence using only topics genuinely covered in the current call. The client holds this slide until the call has ended.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "title", "type": "string", "description": "Short closing title, normally the lesson name or Session complete.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "coveredTopics", "type": "string", "description": "One to six concise topics genuinely covered during this call. Put each topic on a separate line. Do not include planned but uncovered topics.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "takeaway", "type": "string", "description": "Optional single most useful takeaway from the session in one short sentence.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "encouragement", "type": "string", "description": "A short natural thank-you or encouragement. Avoid generic motivational language.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

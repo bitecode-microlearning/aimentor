@@ -1,0 +1,16 @@
+{
+  "type": "client",
+  "name": "showDonationSlide",
+  "description": "Show BiteCode's fixed ad-free support slide only when the mentor naturally mentions supporting or donating to BiteCode. Call no more than once per session. The client owns the trusted donation text and URL.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

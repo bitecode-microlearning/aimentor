@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "showLessonTopic",
+  "description": "Update the BiteCode lesson presentation when the mentor begins a new major topic or subtopic. Do not call for every sentence. Supply a short title and up to six concise points, with one point per line.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "title", "type": "string", "description": "Short learner-facing title of the topic currently being explained.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "points", "type": "string", "description": "Zero to six concise learner-facing points. Put each point on a separate line. Do not include JSON, bullets, or numbering.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

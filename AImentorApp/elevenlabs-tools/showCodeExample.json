@@ -1,0 +1,21 @@
+{
+  "type": "client",
+  "name": "showCodeExample",
+  "description": "Display the exact code fragment, data record, trace, JSON, SQL, or structured example being explained. The content is rendered in a VS Code-style window with preserved whitespace and line numbers.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "title", "type": "string", "description": "Short title describing the example.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "language", "type": "string", "description": "Formatting label such as python, javascript, typescript, json, sql, text, record, or trace.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "code", "type": "string", "description": "The exact complete code or structured data being discussed. Preserve indentation and line breaks. Keep it compact enough to explain verbally.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "explanation", "type": "string", "description": "Optional one-sentence caption identifying what the learner should notice. Do not provide a long second explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

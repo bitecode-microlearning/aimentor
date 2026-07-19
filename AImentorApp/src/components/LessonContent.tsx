@@ -3,8 +3,9 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { CheckCircle2, BookOpen, Code, Lightbulb } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
-import { LessonUnderstandingStatusCard } from './LessonUnderstandingStatusCard';
 import type { LessonEvaluation } from '../domain/lessonUnderstanding';
+import type { LessonPresentationSlide } from '../domain/lessonPresentation';
+import { LessonPresentationStage } from './LessonPresentationStage';
 
 interface LessonSection {
   title: string;
@@ -19,9 +20,10 @@ interface LessonContentProps {
     evaluation: LessonEvaluation;
     context: 'previous' | 'current';
   } | null;
+  presentationSlide?: LessonPresentationSlide | null;
 }
 
-export function LessonContent({ lessonName, sections, lessonEvaluation }: LessonContentProps) {
+export function LessonContent({ lessonName, sections, lessonEvaluation, presentationSlide }: LessonContentProps) {
   return (
     <div className="lesson-content-panel space-y-6">
       {/* Lesson Header */}
@@ -35,22 +37,11 @@ export function LessonContent({ lessonName, sections, lessonEvaluation }: Lesson
         </Badge>
       </div>
 
-      {/* Lesson Introduction */}
-      <Card className="p-6 bg-gradient-to-br from-blue-50 to-transparent border-[#1376C8] border-l-4">
-        <p className="m-0 text-[#666]">
-          Welcome to this interactive lesson! Your AI mentor is ready to help you understand the concepts. 
-          Click the chat button to start a conversation and ask questions at any time.
-        </p>
-      </Card>
-
-      {lessonEvaluation && (
-        <LessonUnderstandingStatusCard
-          lessonName={lessonEvaluation.evaluation.lessonName}
-          status={lessonEvaluation.evaluation.status}
-          context={lessonEvaluation.context}
-          compact={lessonEvaluation.context === 'previous'}
-        />
-      )}
+      <LessonPresentationStage
+        lessonName={lessonName}
+        slide={presentationSlide}
+        evaluation={lessonEvaluation}
+      />
 
       {/* Lesson Sections */}
       <div className="space-y-4">

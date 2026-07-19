@@ -1,0 +1,19 @@
+{
+  "type": "client",
+  "name": "showLessonReview",
+  "description": "Show a presentation-style list of specific topics worth revisiting from previous learning history. This is informational and must not create an additional review or reinforcement loop.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "title", "type": "string", "description": "Short heading such as Topics to revisit or Useful foundations for today.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "topics", "type": "string", "description": "One to six specific topics supported by the supplied learning history, knowledge gaps, or practice recommendations. Put each topic on a separate line. Never invent prior difficulties.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

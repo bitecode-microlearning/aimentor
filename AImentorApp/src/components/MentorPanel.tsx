@@ -15,6 +15,16 @@ import {
   type LessonEvaluation,
   type LessonEvaluationInput,
 } from "../domain/lessonUnderstanding";
+import {
+  normalizePresentationItems,
+  normalizePresentationText,
+  type CodeSlideInput,
+  type LessonPresentationSlide,
+  type QuestionSlideInput,
+  type ReviewSlideInput,
+  type SummarySlideInput,
+  type TopicSlideInput,
+} from "../domain/lessonPresentation";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -37,6 +47,7 @@ interface MentorPanelProps {
   signedSig?: string;
   previousLessonEvaluation?: LessonEvaluation;
   onLessonEvaluationVisible?: (evaluation: LessonEvaluation, context: "previous" | "current") => void;
+  onLessonPresentationChange?: (slide: LessonPresentationSlide | null) => void;
 }
 
 type ConversationInstance = {
@@ -133,6 +144,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   signedSig,
   previousLessonEvaluation,
   onLessonEvaluationVisible,
+  onLessonPresentationChange,
 }) => {
   const [mentorSessionState, setMentorSessionState] = useState<MentorControlState>("idle");
   const [isMicMuted, setIsMicMuted] = useState(true);
@@ -149,6 +161,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [mentorVideo] = useState(pickRandomMentorVideo);
   const conversationRef = useRef<ConversationInstance | null>(null);
   const pendingCurrentEvaluationRef = useRef<LessonEvaluation | null>(null);
+  const pendingSummarySlideRef = useRef<Extract<LessonPresentationSlide, { type: "summary" }> | null>(null);
+  const presentationFinalizedRef = useRef(false);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
   const usageRegistrationTimerRef = useRef<number | null>(null);
@@ -167,6 +181,22 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     mentorSessionState !== "disconnected" &&
     mentorSessionState !== "error";
   const isLessonTimerActive = isSessionActive && hasElevenLabsSessionStarted;
+
+  const finalizeLessonPresentation = () => {
+    if (presentationFinalizedRef.current) return;
+    presentationFinalizedRef.current = true;
+    const completedEvaluation = pendingCurrentEvaluationRef.current;
+    const completedSummary = pendingSummarySlideRef.current ?? (completedEvaluation ? {
+      type: "summary" as const,
+      title: lessonname || "Session complete",
+      coveredTopics: [],
+      encouragement: "Thanks for taking part in this AI mentor session.",
+    } : null);
+    pendingCurrentEvaluationRef.current = null;
+    pendingSummarySlideRef.current = null;
+    if (completedSummary) onLessonPresentationChange?.(completedSummary);
+    if (completedEvaluation) onLessonEvaluationVisible?.(completedEvaluation, "current");
+  };
 
   const setControlState = (nextState: MentorControlState) => {
     debugMentorControls("state change", { from: stateRef.current, to: nextState });
@@ -454,6 +484,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (mentorSessionState === "connecting" || isSessionActive) return;
 
     pendingCurrentEvaluationRef.current = null;
+    pendingSummarySlideRef.current = null;
+    presentationFinalizedRef.current = false;
+    onLessonPresentationChange?.(null);
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
     setTokenSupportDebugMessage("");
@@ -566,6 +599,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             reason: details.reason,
             closeCode: "closeCode" in details ? details.closeCode : undefined,
           });
+          finalizeLessonPresentation();
           setErrorMessage(disconnectMessage);
           userRequestedEndRef.current = false;
           resetSessionState("disconnected");
@@ -587,12 +621,66 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             handleMentorMessage({ source: "user", message: payload?.message ?? payload });
           },
           onEnd: async () => {
-            const completedEvaluation = pendingCurrentEvaluationRef.current;
-            pendingCurrentEvaluationRef.current = null;
-            if (completedEvaluation) {
-              onLessonEvaluationVisible?.(completedEvaluation, "current");
-            }
+            finalizeLessonPresentation();
             resetSessionState("disconnected");
+          },
+          showLessonTopic: async (payload: TopicSlideInput) => {
+            const title = normalizePresentationText(payload?.title, lessonname || "Current topic", 180);
+            const points = normalizePresentationItems(payload?.points);
+            onLessonPresentationChange?.({ type: "topic", title, points });
+            return "Displayed the current topic in the lesson presentation area.";
+          },
+          showLessonReview: async (payload: ReviewSlideInput) => {
+            const title = normalizePresentationText(payload?.title, "Topics to revisit", 180);
+            const topics = normalizePresentationItems(payload?.topics);
+            if (!topics.length) throw new Error("Lesson review requires at least one review topic.");
+            if (previousLessonEvaluation) onLessonEvaluationVisible?.(previousLessonEvaluation, "previous");
+            onLessonPresentationChange?.({ type: "review", title, topics });
+            return "Displayed the lesson review topics. Continue the planned lesson without adding a reinforcement loop.";
+          },
+          showMentorQuestion: async (payload: QuestionSlideInput) => {
+            const question = normalizePresentationText(payload?.question, "", 600);
+            if (!question) throw new Error("Mentor question text is required.");
+            const supportingText = normalizePresentationText(payload?.supportingText, "", 300);
+            onLessonPresentationChange?.({
+              type: "question",
+              question,
+              ...(supportingText ? { supportingText } : {}),
+            });
+            return "Displayed the exact question for the learner to read.";
+          },
+          showCodeExample: async (payload: CodeSlideInput) => {
+            const code = normalizePresentationText(payload?.code, "", 6000);
+            if (!code) throw new Error("Code or record content is required.");
+            const title = normalizePresentationText(payload?.title, "Example", 180);
+            const language = normalizePresentationText(payload?.language, "text", 40).toLowerCase();
+            const explanation = normalizePresentationText(payload?.explanation, "", 500);
+            onLessonPresentationChange?.({
+              type: "code",
+              title,
+              language,
+              code,
+              ...(explanation ? { explanation } : {}),
+            });
+            return "Displayed the exact code or data example in the lesson presentation area.";
+          },
+          showDonationSlide: async () => {
+            onLessonPresentationChange?.({ type: "donation" });
+            return "Displayed the BiteCode ad-free support slide. Continue the conversation naturally.";
+          },
+          showSessionSummary: async (payload: SummarySlideInput) => {
+            const coveredTopics = normalizePresentationItems(payload?.coveredTopics);
+            const title = normalizePresentationText(payload?.title, lessonname || "Session complete", 180);
+            const takeaway = normalizePresentationText(payload?.takeaway, "", 500);
+            const encouragement = normalizePresentationText(payload?.encouragement, "Thanks for taking part in this AI mentor session.", 300);
+            pendingSummarySlideRef.current = {
+              type: "summary",
+              title,
+              coveredTopics,
+              ...(takeaway ? { takeaway } : {}),
+              encouragement,
+            };
+            return "Prepared the closing lesson summary. It will be displayed after the call ends.";
           },
           showPreviousLessonEvaluation: async () => {
             if (!previousLessonEvaluation) {
