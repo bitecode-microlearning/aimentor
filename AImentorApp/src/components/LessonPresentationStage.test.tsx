@@ -7,8 +7,14 @@ afterEach(cleanup);
 
 describe("LessonPresentationStage", () => {
   it("shows the exact mentor question", () => {
-    render(<LessonPresentationStage lessonName="State" slide={{ type: "question", question: "What changes after this assignment?" }} />);
+    render(<LessonPresentationStage lessonName="State" slide={{ type: "question", questionKind: "explanation", question: "What changes after this assignment?" }} />);
     expect(screen.getByText("What changes after this assignment?")).toBeTruthy();
+    expect(screen.getByText("Explain your thinking")).toBeTruthy();
+  });
+
+  it("gives true-or-false questions their own heading", () => {
+    render(<LessonPresentationStage lessonName="State" slide={{ type: "question", questionKind: "true_false", question: "A function can have side effects. True or false?" }} />);
+    expect(screen.getByText("True or false?")).toBeTruthy();
   });
 
   it.each([
@@ -32,10 +38,12 @@ describe("LessonPresentationStage", () => {
     expect(screen.getByText("count += 1")).toBeTruthy();
   });
 
-  it("shows review topics as a readable list", () => {
-    render(<LessonPresentationStage lessonName="State" slide={{ type: "review", title: "Topics to revisit", topics: ["Loop state", "Branch decisions"] }} />);
-    expect(screen.getByText("Loop state")).toBeTruthy();
-    expect(screen.getByText("Branch decisions")).toBeTruthy();
+  it("shows a simple previous-lesson recap", () => {
+    render(<LessonPresentationStage lessonName="State" slide={{ type: "review", title: "Reading production code", wentWell: ["Identified inputs"], checkAgain: ["Hidden side effects"] }} />);
+    expect(screen.getByText("What went well")).toBeTruthy();
+    expect(screen.getByText("Check again")).toBeTruthy();
+    expect(screen.getByText("Identified inputs")).toBeTruthy();
+    expect(screen.getByText("Hidden side effects")).toBeTruthy();
   });
 
   it("uses the fixed BiteCode support URL", () => {

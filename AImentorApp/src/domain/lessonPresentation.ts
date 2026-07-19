@@ -7,12 +7,13 @@ export type LessonPresentationSlide =
   | {
       type: "review";
       title: string;
-      topics: string[];
+      wentWell: string[];
+      checkAgain: string[];
     }
   | {
       type: "question";
+      questionKind: "true_false" | "explanation";
       question: string;
-      supportingText?: string;
     }
   | {
       type: "answer_feedback";
@@ -44,12 +45,12 @@ export interface TopicSlideInput {
 
 export interface ReviewSlideInput {
   title?: string;
-  topics?: unknown;
+  wentWell?: unknown;
+  checkAgain?: unknown;
 }
 
 export interface QuestionSlideInput {
   question?: string;
-  supportingText?: string;
 }
 
 export interface AnswerFeedbackSlideInput {

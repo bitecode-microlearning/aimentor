@@ -2867,6 +2867,35 @@ html {
   color: #00a976;
 }
 
+.lesson-stage-recap-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.lesson-stage-recap-group {
+  padding: 15px;
+  background: #fff;
+  border: 1px solid #dfe4ea;
+  border-radius: 10px;
+}
+
+.lesson-stage-recap-group h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #34383e;
+  font-size: .95rem;
+}
+
+.lesson-stage-recap-group .lesson-stage-list { margin-top: 10px; gap: 6px; }
+.lesson-stage-recap-group .lesson-stage-list li { padding: 7px 0; border: 0; }
+.lesson-stage-recap-good h4 { color: #007955; }
+.lesson-stage-recap-check h4 { color: #9a5705; }
+.lesson-stage-recap-check .lesson-stage-list li > span:first-child { color: #e98a10; }
+
 .lesson-stage-question {
   display: flex;
   min-height: 250px;
@@ -3086,6 +3115,7 @@ html {
   .lesson-stage-code { padding: 12px; }
   .lesson-stage-code-toolbar { grid-template-columns: 54px minmax(0, 1fr) auto; }
   .lesson-stage-question blockquote { font-size: 1.45rem; }
+  .lesson-stage-recap-columns { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

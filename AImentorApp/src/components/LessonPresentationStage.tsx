@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, CheckCircle2, CircleAlert, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, Sparkles, XCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, CircleAlert, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import type { LessonEvaluation } from "../domain/lessonUnderstanding";
 import type { LessonPresentationSlide } from "../domain/lessonPresentation";
 import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
@@ -83,10 +83,18 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
   if (slide.type === "review") {
     return (
       <section className="lesson-stage lesson-stage-review" aria-live="polite">
-        <div className="lesson-stage-heading"><ClipboardCheck size={26} aria-hidden="true" /><p>Lesson review</p></div>
+        <div className="lesson-stage-heading"><ClipboardCheck size={26} aria-hidden="true" /><p>Last time</p></div>
         <h3>{slide.title}</h3>
-        {renderEvaluation("previous")}
-        <SlideList items={slide.topics} />
+        <div className="lesson-stage-recap-columns">
+          <div className="lesson-stage-recap-group lesson-stage-recap-good">
+            <h4><CheckCircle2 size={20} aria-hidden="true" /> What went well</h4>
+            <SlideList items={slide.wentWell} />
+          </div>
+          <div className="lesson-stage-recap-group lesson-stage-recap-check">
+            <h4><RefreshCw size={20} aria-hidden="true" /> Check again</h4>
+            <SlideList items={slide.checkAgain} />
+          </div>
+        </div>
       </section>
     );
   }
@@ -94,9 +102,8 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
   if (slide.type === "question") {
     return (
       <section className="lesson-stage lesson-stage-question" aria-live="polite" aria-label="Mentor question">
-        <div className="lesson-stage-heading"><CircleHelp size={28} aria-hidden="true" /><p>Your question</p></div>
+        <div className="lesson-stage-heading"><CircleHelp size={28} aria-hidden="true" /><p>{slide.questionKind === "true_false" ? "True or false?" : "Explain your thinking"}</p></div>
         <blockquote>{slide.question}</blockquote>
-        {slide.supportingText && <p className="lesson-stage-supporting">{slide.supportingText}</p>}
       </section>
     );
   }

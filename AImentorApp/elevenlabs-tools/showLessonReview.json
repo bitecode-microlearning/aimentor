@@ -1,12 +1,13 @@
 {
   "type": "client",
   "name": "showLessonReview",
-  "description": "Show a presentation-style list of specific topics worth revisiting from previous learning history. This is informational and must not create an additional review or reinforcement loop.",
+  "description": "Show one short, factual previous-lesson recap with separate What went well and Check again bullet lists. Call at most once, only from reliable history, and never turn it into a review loop.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [
-    { "id": "title", "type": "string", "description": "Short heading such as Topics to revisit or Useful foundations for today.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
-    { "id": "topics", "type": "string", "description": "One to six specific topics supported by the supplied learning history, knowledge gaps, or practice recommendations. Put each topic on a separate line. Never invent prior difficulties.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+    { "id": "title", "type": "string", "description": "The previous lesson name or a short factual recap title.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "wentWell", "type": "string", "description": "Zero to four concise facts about concepts the learner understood or handled well. One point per line. Use only reliable history; never invent praise.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
+    { "id": "checkAgain", "type": "string", "description": "Zero to four concise concepts that need another look. One point per line. Use only reliable knowledge gaps or practice recommendations; never invent difficulties.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

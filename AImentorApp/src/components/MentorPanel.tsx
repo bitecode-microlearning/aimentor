@@ -632,23 +632,34 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             return "Displayed the current topic in the lesson presentation area.";
           },
           showLessonReview: async (payload: ReviewSlideInput) => {
-            const title = normalizePresentationText(payload?.title, "Topics to revisit", 180);
-            const topics = normalizePresentationItems(payload?.topics);
-            if (!topics.length) throw new Error("Lesson review requires at least one review topic.");
-            if (previousLessonEvaluation) onLessonEvaluationVisible?.(previousLessonEvaluation, "previous");
-            onLessonPresentationChange?.({ type: "review", title, topics });
-            return "Displayed the lesson review topics. Continue the planned lesson without adding a reinforcement loop.";
+            const title = normalizePresentationText(payload?.title, "Your previous lesson", 180);
+            const wentWell = normalizePresentationItems(payload?.wentWell, 4);
+            const checkAgain = normalizePresentationItems(payload?.checkAgain, 4);
+            if (!wentWell.length && !checkAgain.length) throw new Error("Lesson recap requires at least one supported point.");
+            onLessonPresentationChange?.({ type: "review", title, wentWell, checkAgain });
+            return "Displayed the short previous-lesson recap. Continue the planned lesson without adding a review loop.";
           },
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Mentor question text is required.");
-            const supportingText = normalizePresentationText(payload?.supportingText, "", 300);
             onLessonPresentationChange?.({
               type: "question",
+              questionKind: "explanation",
               question,
-              ...(supportingText ? { supportingText } : {}),
             });
-            return "Displayed the exact question for the learner to read.";
+            return "Displayed the explanation question. Speak the exact question now without any intervening words.";
+          },
+          showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
+            const question = normalizePresentationText(payload?.question, "", 600);
+            if (!question) throw new Error("True-or-false question text is required.");
+            onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
+            return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
+          },
+          showExplanationQuestion: async (payload: QuestionSlideInput) => {
+            const question = normalizePresentationText(payload?.question, "", 600);
+            if (!question) throw new Error("Explanation question text is required.");
+            onLessonPresentationChange?.({ type: "question", questionKind: "explanation", question });
+            return "Displayed the explanation question. Speak the exact question now without any intervening words.";
           },
           showAnswerFeedback: async (payload: AnswerFeedbackSlideInput) => {
             const result = normalizePresentationText(payload?.result, "", 20).toLowerCase().replace(/[ -]+/g, "_");
@@ -701,8 +712,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               debugMentorControls("previous lesson evaluation unavailable");
               return "No previous lesson evaluation is available. Continue without showing a result.";
             }
-            onLessonEvaluationVisible?.(previousLessonEvaluation, "previous");
-            return `The previous lesson result is available in the lesson content: ${previousLessonEvaluation.status}. Continue the normal lesson without adding a reinforcement loop.`;
+            return `Previous lesson status: ${previousLessonEvaluation.status}. Use it only as background for one concise showLessonReview recap; do not display a score card or add a reinforcement loop.`;
           },
           reportLessonEvaluation: async (payload: LessonEvaluationInput) => {
             const totalQuestions = Number(payload?.totalQuestions);

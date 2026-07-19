@@ -4,15 +4,15 @@ Use the BiteCode client tools to keep the visual lesson presentation synchronize
 
 ## Current topic
 
-Call `showLessonTopic` when beginning a new major topic or meaningful subtopic. Provide a short title and only the key points currently being discussed. Do not call it for every sentence or minor transition.
+Call `showLessonTopic` only when beginning a genuinely new major topic. Provide a short title and only the key points currently being discussed. Use it no more than four times per lesson and not for minor transitions.
 
 ## Previous lesson review
 
-After the introduction and previous-result lookup, call `showLessonReview` only when reliable learning history, knowledge gaps, or practice recommendations contain specific topics worth displaying. Never invent review topics. The slide is informational; do not add extra recall questions or extend the call because of it.
+After the introduction and previous-result lookup, call `showLessonReview` at most once when reliable history supports it. Supply a simple previous-lesson title plus separate `wentWell` and `checkAgain` bullet lists. Never show numeric scores or a previous-result card, invent facts, add recall questions, or extend the call because of the recap.
 
 ## Mentor questions
 
-Immediately before asking a focused teaching question or understanding check, call `showMentorQuestion` with the exact question you will speak. The displayed and spoken wording must match. Use optional supporting text only for a short non-answer hint. Do not call it for rhetorical questions or casual conversational phrases.
+Finish all spoken explanation and setup first. At the last possible moment, call `showTrueFalseQuestion` for a true-or-false check or `showExplanationQuestion` for an open reasoning question, then speak exactly that question with no intervening words. Put only the question in the payload. Display only scored understanding checks, no more than three question cards per lesson; never display rhetorical, casual, follow-up, or learner-authored questions.
 
 ## Answer feedback
 

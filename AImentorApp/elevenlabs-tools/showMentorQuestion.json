@@ -1,12 +1,11 @@
 {
   "type": "client",
   "name": "showMentorQuestion",
-  "description": "Display the exact question the mentor is asking so the learner can read it while listening. Call immediately before asking a focused teaching or understanding-check question.",
+  "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, complete the spoken setup first, then call immediately before speaking the exact question.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [
-    { "id": "question", "type": "string", "description": "The exact learner-facing question that will be spoken. Do not paraphrase or add internal instructions.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
-    { "id": "supportingText", "type": "string", "description": "Optional short hint or context that does not reveal the answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null }
+    { "id": "question", "type": "string", "description": "Only the exact learner-facing question that will be spoken next. Do not add setup, a hint, or an answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

@@ -1,0 +1,18 @@
+{
+  "type": "client",
+  "name": "showTrueFalseQuestion",
+  "description": "Display one scored true-or-false understanding check. Complete all spoken setup first, call this tool immediately before the question, then speak exactly the supplied question with no intervening words. Use at most twice per lesson.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "question", "type": "string", "description": "Only the exact true-or-false statement/question that will be spoken next. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}
