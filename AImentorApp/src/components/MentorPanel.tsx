@@ -402,8 +402,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       if (
         closingSummaryCompletedRef.current &&
-        closingEvaluationCompletedRef.current &&
-        /\b(?:goodbye|good-bye|see you|talk to you soon|until next time|take care)\b/i.test(text)
+        closingEvaluationCompletedRef.current
       ) {
         closingFarewellDetectedRef.current = true;
       }
