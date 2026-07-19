@@ -630,7 +630,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           },
           showLessonPhase: async (payload: LessonPhaseInput) => {
             const phase = normalizeLessonPhase(payload);
-            if (!phase) throw new Error("Lesson phase requires a valid current number, total number, and short title.");
+            if (!phase) throw new Error("Unknown lesson phase. Use one of the fixed BiteCode phase identifiers.");
             setLessonPhase(phase);
             return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
           },

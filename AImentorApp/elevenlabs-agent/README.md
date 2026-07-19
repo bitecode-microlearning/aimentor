@@ -3,6 +3,7 @@
 This folder contains the complete version-controlled system prompt used by the BiteCode ElevenLabs AI Mentor agent.
 
 - `system-prompt.md` is the complete prompt to paste into the ElevenLabs agent.
+- `workflow-prompt.md` is the version-controlled lesson workflow supplied to the agent configuration process.
 - Import-ready client tool definitions are stored in `../elevenlabs-tools/`.
 
 When updating the dashboard configuration:

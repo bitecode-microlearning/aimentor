@@ -1,13 +1,11 @@
 {
   "type": "client",
   "name": "showLessonPhase",
-  "description": "Update the compact BiteCode mentor status label when the lesson moves to a new planned phase. Call once at the start of each phase, before speaking its content. Do not call for minor transitions or repeat the same phase.",
+  "description": "Notify BiteCode that the lesson entered one fixed workflow phase. Send only the phase identifier; BiteCode owns and calculates the phase order, total, and learner-facing label. Call once at the start of a phase and never repeat the same phase.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [
-    { "id": "current", "type": "integer", "description": "One-based current phase number, such as 1.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
-    { "id": "total", "type": "integer", "description": "Total number of planned lesson phases. Keep this value stable throughout the call and no greater than 10.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
-    { "id": "title", "type": "string", "description": "Short learner-facing phase label, ideally two to five words, such as Calibration questions, Core concept, Guided example, Understanding check, or Wrap-up.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+    { "id": "phase", "type": "string", "description": "Fixed phase identifier. Use exactly one of: introduction, previous_lesson_review, calibration, main_lesson, knowledge_check, session_wrap_up.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": ["introduction", "previous_lesson_review", "calibration", "main_lesson", "knowledge_check", "session_wrap_up"] }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

@@ -27,11 +27,11 @@ describe("normalizeTrueFalseQuestion", () => {
 
 describe("normalizeLessonPhase", () => {
   it("accepts a bounded lesson phase", () => {
-    expect(normalizeLessonPhase({ current: 1, total: 5, title: "Calibration questions" }))
-      .toEqual({ current: 1, total: 5, title: "Calibration questions" });
+    expect(normalizeLessonPhase({ phase: "calibration" }))
+      .toEqual({ id: "calibration", current: 3, total: 6, title: "Calibration questions" });
   });
 
-  it("rejects invalid phase progress", () => {
-    expect(normalizeLessonPhase({ current: 6, total: 5, title: "Wrap-up" })).toBeNull();
+  it("rejects an unknown phase identifier", () => {
+    expect(normalizeLessonPhase({ phase: "made_up_phase" })).toBeNull();
   });
 });

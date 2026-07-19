@@ -4,7 +4,7 @@ Use the BiteCode client tools to keep the visual lesson presentation synchronize
 
 ## Session phase status
 
-At the start of each planned lesson phase, call `showLessonPhase` once before speaking its content. Provide the sequential one-based phase number, a stable total of normally three to five phases, and a short learner-facing label such as Calibration questions, Core concept, Guided example, Understanding check, or Wrap-up. Do not repeat phases, call it for minor transitions, add content because of it, or announce the tool call.
+At the start of each fixed workflow phase, call `showLessonPhase` once before speaking its content. Send only one exact `phase` identifier in this order: `introduction`, optional `previous_lesson_review`, `calibration`, `main_lesson`, `knowledge_check`, `session_wrap_up`. BiteCode calculates the number, total, and label. Never send those display values, renumber after skipping the optional review, repeat phases, call for minor transitions, add content because of it, or announce the tool call.
 
 ## Current topic
 

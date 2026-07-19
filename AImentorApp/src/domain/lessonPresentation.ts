@@ -73,16 +73,32 @@ export interface SummarySlideInput {
 }
 
 export interface LessonPhaseInput {
-  current?: unknown;
-  total?: unknown;
-  title?: unknown;
+  phase?: unknown;
 }
 
 export interface LessonPhase {
+  id: LessonPhaseId;
   current: number;
   total: number;
   title: string;
 }
+
+export type LessonPhaseId =
+  | "introduction"
+  | "previous_lesson_review"
+  | "calibration"
+  | "main_lesson"
+  | "knowledge_check"
+  | "session_wrap_up";
+
+export const LESSON_PHASES: ReadonlyArray<{ id: LessonPhaseId; title: string }> = [
+  { id: "introduction", title: "Introduction" },
+  { id: "previous_lesson_review", title: "Previous lesson review" },
+  { id: "calibration", title: "Calibration questions" },
+  { id: "main_lesson", title: "Main lesson" },
+  { id: "knowledge_check", title: "Knowledge check" },
+  { id: "session_wrap_up", title: "Session wrap-up" },
+];
 
 export function normalizePresentationText(value: unknown, fallback = "", maxLength = 1000): string {
   const normalized = String(value ?? "").trim();
@@ -99,15 +115,18 @@ export function normalizeTrueFalseQuestion(value: unknown): string {
 }
 
 export function normalizeLessonPhase(input: LessonPhaseInput): LessonPhase | null {
-  const current = Number(input?.current);
-  const total = Number(input?.total);
-  const title = normalizePresentationText(input?.title, "", 80);
+  const phaseId = normalizePresentationText(input?.phase, "", 60)
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_") as LessonPhaseId;
+  const index = LESSON_PHASES.findIndex(({ id }) => id === phaseId);
+  if (index < 0) return null;
 
-  if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || total < 1 || total > 10 || current > total || !title) {
-    return null;
-  }
-
-  return { current, total, title };
+  return {
+    id: LESSON_PHASES[index].id,
+    current: index + 1,
+    total: LESSON_PHASES.length,
+    title: LESSON_PHASES[index].title,
+  };
 }
 
 export function normalizePresentationItems(value: unknown, maxItems = 6): string[] {
