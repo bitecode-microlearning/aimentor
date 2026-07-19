@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "showTrueFalseQuestion",
-  "description": "Display one scored true-or-false understanding check. Complete all spoken setup first, call this tool immediately before the question, then speak exactly the supplied question with no intervening words. Use at most twice per lesson.",
+  "description": "Display one workflow true-or-false understanding check. First speak exactly: Okay, here’s a question. Only after that cue has been spoken, call this tool so the panel changes at that moment. Then immediately speak the supplied statement with no intervening words. Use for the two optional previous-review checks and the three current-lesson knowledge checks.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [

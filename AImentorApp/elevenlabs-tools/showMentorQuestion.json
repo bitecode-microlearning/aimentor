@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "showMentorQuestion",
-  "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, complete the spoken setup first, then call immediately before speaking the exact question.",
+  "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, first speak exactly: Okay, here’s a question. Then call this tool and immediately speak the exact question with no intervening words.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [

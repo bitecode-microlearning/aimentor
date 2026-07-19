@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "showExplanationQuestion",
-  "description": "Display one scored open explanation or reasoning question. Complete all spoken setup first, call this tool immediately before the question, then speak exactly the supplied question with no intervening words. Use at most twice per lesson.",
+  "description": "Display one open explanation, reasoning, or calibration question. First speak exactly: Okay, here’s a question. Only after that cue has been spoken, call this tool so the panel changes at that moment. Then immediately speak the supplied question with no intervening words. Calibration may use up to three calls.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [

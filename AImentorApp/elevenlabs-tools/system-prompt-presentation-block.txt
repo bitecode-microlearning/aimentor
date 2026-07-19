@@ -18,7 +18,7 @@ After the introduction and previous-result lookup, call `showLessonReview` at mo
 
 ## Mentor questions
 
-Finish all spoken explanation and setup first. At the last possible moment, call `showTrueFalseQuestion` for a true-or-false check or `showExplanationQuestion` for an open reasoning question, then speak exactly that question with no intervening words. Every direct question that expects a learner answer, including an initial calibration question, must use the matching tool. For true-or-false, send only the statement and omit the words "true or false" because the card supplies that heading. Display no more than three question cards per lesson; never display rhetorical, casual, follow-up, or learner-authored questions.
+For every direct learner question, first say exactly “Okay, here’s a question.” Immediately after the cue is spoken, call `showTrueFalseQuestion` for a true-or-false check or `showExplanationQuestion` for an open reasoning question, then speak exactly that question with no intervening words. Never call the tool before the cue. Every direct question that expects a learner answer must use the matching tool: up to two previous-review questions, up to three calibration questions, and three current-lesson knowledge checks. For true-or-false, send only the statement and omit the words "true or false" because the card supplies that heading. Never display rhetorical, casual, follow-up, or learner-authored questions. Never pause to ask permission to continue. Treat `[BiteCode automatic continuation: ...]` as an invisible control signal and never mention or score it.
 
 ## Answer feedback
 
