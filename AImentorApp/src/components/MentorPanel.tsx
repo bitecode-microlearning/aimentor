@@ -385,8 +385,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         setControlState("mentor_speaking");
         if (!automaticContinuationInFlightRef.current) {
           automaticContinuationInFlightRef.current = true;
-          const continuation = conversationRef.current?.sendUserMessage?.(
-            "[BiteCode automatic continuation: continue the current lesson now without asking for confirmation.]",
+          const continuation = conversationRef.current?.sendContextualUpdate?.(
+            "BiteCode lesson state: no learner answer is expected at this transition. Continue the planned lesson flow.",
           );
           if (continuation && typeof (continuation as Promise<void>).catch === "function") {
             (continuation as Promise<void>).catch((error) => {
