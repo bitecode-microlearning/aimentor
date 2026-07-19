@@ -176,6 +176,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const conversationRef = useRef<ConversationInstance | null>(null);
   const pendingCurrentEvaluationRef = useRef<LessonEvaluation | null>(null);
   const pendingSummarySlideRef = useRef<Extract<LessonPresentationSlide, { type: "summary" }> | null>(null);
+  const pendingQuestionSlideRef = useRef<Extract<LessonPresentationSlide, { type: "question" }> | null>(null);
   const presentationFinalizedRef = useRef(false);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
@@ -203,6 +204,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setLessonPhase(phase);
   };
 
+  const queueQuestionSlide = (slide: Extract<LessonPresentationSlide, { type: "question" }>) => {
+    if (stateRef.current === "mentor_waiting_for_answer") {
+      onLessonPresentationChange?.(slide);
+      return;
+    }
+    pendingQuestionSlideRef.current = slide;
+  };
+
   const finalizeLessonPresentation = () => {
     if (presentationFinalizedRef.current) return;
     presentationFinalizedRef.current = true;
@@ -215,6 +224,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     } : null);
     pendingCurrentEvaluationRef.current = null;
     pendingSummarySlideRef.current = null;
+    pendingQuestionSlideRef.current = null;
     if (completedSummary) onLessonPresentationChange?.(completedSummary);
     if (completedEvaluation) onLessonEvaluationVisible?.(completedEvaluation, "current");
   };
@@ -288,6 +298,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     previousReviewActiveRef.current = false;
     previousReviewFeedbackCountRef.current = 0;
     deferredLessonPhaseRef.current = null;
+    pendingQuestionSlideRef.current = null;
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
     clearProgressTimer();
@@ -368,6 +379,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     if (nextMode === "listening") {
       if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
+
+      const pendingQuestion = pendingQuestionSlideRef.current;
+      pendingQuestionSlideRef.current = null;
+      if (pendingQuestion) onLessonPresentationChange?.(pendingQuestion);
 
       // ElevenLabs listening mode is the authoritative signal that the learner
       // may speak. Transcript wording is not reliable enough to gate the mic.
@@ -508,6 +523,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     pendingCurrentEvaluationRef.current = null;
     pendingSummarySlideRef.current = null;
+    pendingQuestionSlideRef.current = null;
     presentationFinalizedRef.current = false;
     onLessonPresentationChange?.(null);
     setErrorMessage(null);
@@ -693,24 +709,24 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Mentor question text is required.");
-            onLessonPresentationChange?.({
+            queueQuestionSlide({
               type: "question",
               questionKind: "explanation",
               question,
             });
-            return "Displayed the explanation question. Speak the exact question now without any intervening words.";
+            return "Queued the explanation question. It will appear when speaking ends and the learner may answer.";
           },
           showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizeTrueFalseQuestion(payload?.question);
             if (!question) throw new Error("True-or-false question text is required.");
-            onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
-            return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
+            queueQuestionSlide({ type: "question", questionKind: "true_false", question });
+            return "Queued the true-or-false question. It will appear when speaking ends and the learner may answer.";
           },
           showExplanationQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Explanation question text is required.");
-            onLessonPresentationChange?.({ type: "question", questionKind: "explanation", question });
-            return "Displayed the explanation question. Speak the exact question now without any intervening words.";
+            queueQuestionSlide({ type: "question", questionKind: "explanation", question });
+            return "Queued the explanation question. It will appear when speaking ends and the learner may answer.";
           },
           showAnswerFeedback: async (payload: AnswerFeedbackSlideInput) => {
             const result = normalizePresentationText(payload?.result, "", 20).toLowerCase().replace(/[ -]+/g, "_");
