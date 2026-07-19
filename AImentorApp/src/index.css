@@ -2781,6 +2781,7 @@ html {
 }
 
 .lesson-content-formatted { color: #3e4650; font-size: 1rem; line-height: 1.7; }
+.lesson-section-title { color: #263442; font-weight: 800; }
 .lesson-content-formatted p { margin: 0 0 12px; }
 .lesson-content-formatted p:last-child { margin-bottom: 0; }
 .lesson-content-formatted ul { display: grid; gap: 8px; margin: 0; padding-left: 22px; }

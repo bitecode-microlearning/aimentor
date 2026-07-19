@@ -114,7 +114,7 @@ export function LessonContent({ lessonName, sections, lessonEvaluation, presenta
               {section.type === 'tip' && <Lightbulb className="text-[#00CE8D] flex-shrink-0 mt-1" size={24} />}
               {section.type === 'text' && <CheckCircle2 className="text-[#1376C8] flex-shrink-0 mt-1" size={24} />}
               <div className="flex-1">
-                <h3 className="mt-0 mb-3">{section.title}</h3>
+                <h3 className="lesson-section-title mt-0 mb-3">{section.title}</h3>
                 <RichFormattedLessonText content={section.content} type={section.type} title={section.title} />
               </div>
             </div>
