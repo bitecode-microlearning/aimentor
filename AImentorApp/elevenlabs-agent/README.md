@@ -7,7 +7,7 @@ This folder contains the complete version-controlled system prompt used by the B
 
 When updating the dashboard configuration:
 
-1. Import or update all client tools from `../elevenlabs-tools/`.
+1. Import or update all client tools from `../elevenlabs-tools/`, including `showAnswerFeedback`.
 2. Replace the agent system prompt with the complete contents of `system-prompt.md`.
 3. Confirm that tool and parameter names retain their exact case.
 4. Publish the agent and run a signed DEV mentor session.

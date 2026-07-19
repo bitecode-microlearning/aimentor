@@ -2885,6 +2885,46 @@ html {
   border: 0;
 }
 
+.lesson-stage-feedback {
+  display: flex;
+  min-height: 260px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.lesson-stage-feedback .lesson-stage-kicker { margin-top: 14px; }
+.lesson-stage-feedback h3 { margin-bottom: 4px; font-size: clamp(1.8rem, 4vw, 2.7rem); }
+.lesson-stage-feedback > p:last-child { max-width: 520px; }
+
+.lesson-stage-feedback-correct {
+  color: #00865f;
+  background: #effbf7;
+  border-left-color: #00a976;
+}
+
+.lesson-stage-feedback-correct h3,
+.lesson-stage-feedback-correct .lesson-stage-kicker { color: #007955; }
+
+.lesson-stage-feedback-not_quite {
+  color: #a55a00;
+  background: #fff8e8;
+  border-left-color: #e98a10;
+}
+
+.lesson-stage-feedback-not_quite h3,
+.lesson-stage-feedback-not_quite .lesson-stage-kicker { color: #8b4c00; }
+
+.lesson-stage-feedback-wrong {
+  color: #c53535;
+  background: #fff4f4;
+  border-left-color: #d94242;
+}
+
+.lesson-stage-feedback-wrong h3,
+.lesson-stage-feedback-wrong .lesson-stage-kicker { color: #b52929; }
+
 .lesson-stage-supporting {
   color: #626a74 !important;
   font-size: .92rem !important;

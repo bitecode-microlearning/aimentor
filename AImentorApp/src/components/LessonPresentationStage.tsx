@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, Sparkles } from "lucide-react";
+import { BookOpen, CheckCircle2, CircleAlert, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, Sparkles, XCircle } from "lucide-react";
 import type { LessonEvaluation } from "../domain/lessonUnderstanding";
 import type { LessonPresentationSlide } from "../domain/lessonPresentation";
 import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
@@ -97,6 +97,40 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
         <div className="lesson-stage-heading"><CircleHelp size={28} aria-hidden="true" /><p>Your question</p></div>
         <blockquote>{slide.question}</blockquote>
         {slide.supportingText && <p className="lesson-stage-supporting">{slide.supportingText}</p>}
+      </section>
+    );
+  }
+
+  if (slide.type === "answer_feedback") {
+    const feedback = {
+      correct: {
+        label: "Correct",
+        description: "That answer captures the key idea.",
+        icon: CheckCircle2,
+      },
+      not_quite: {
+        label: "Not quite",
+        description: "You’re close, but one detail needs adjusting.",
+        icon: CircleAlert,
+      },
+      wrong: {
+        label: "Wrong",
+        description: "That answer does not match the concept yet.",
+        icon: XCircle,
+      },
+    }[slide.result];
+    const FeedbackIcon = feedback.icon;
+    return (
+      <section
+        className={`lesson-stage lesson-stage-feedback lesson-stage-feedback-${slide.result}`}
+        aria-live="polite"
+        role="status"
+        aria-label={`Answer feedback: ${feedback.label}`}
+      >
+        <FeedbackIcon size={62} strokeWidth={2.2} aria-hidden="true" />
+        <p className="lesson-stage-kicker">Answer feedback</p>
+        <h3>{feedback.label}</h3>
+        <p>{slide.message || feedback.description}</p>
       </section>
     );
   }

@@ -11,6 +11,20 @@ describe("LessonPresentationStage", () => {
     expect(screen.getByText("What changes after this assignment?")).toBeTruthy();
   });
 
+  it.each([
+    ["correct", "Correct", "lesson-stage-feedback-correct"],
+    ["not_quite", "Not quite", "lesson-stage-feedback-not_quite"],
+    ["wrong", "Wrong", "lesson-stage-feedback-wrong"],
+  ] as const)("renders %s answer feedback with its distinct card state", (result, label, className) => {
+    const { container } = render(<LessonPresentationStage
+      lessonName="State"
+      slide={{ type: "answer_feedback", result, message: "Short feedback." }}
+    />);
+    expect(screen.getByRole("status", { name: `Answer feedback: ${label}` })).toBeTruthy();
+    expect(screen.getByText(label)).toBeTruthy();
+    expect(container.querySelector("section")?.classList.contains(className)).toBe(true);
+  });
+
   it("formats code with a language label and line numbers", () => {
     render(<LessonPresentationStage lessonName="State" slide={{ type: "code", title: "Counter", language: "python", code: "count = 0\ncount += 1" }} />);
     expect(screen.getByText("python")).toBeTruthy();

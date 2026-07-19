@@ -15,6 +15,11 @@ export type LessonPresentationSlide =
       supportingText?: string;
     }
   | {
+      type: "answer_feedback";
+      result: "correct" | "not_quite" | "wrong";
+      message?: string;
+    }
+  | {
       type: "code";
       title: string;
       language: string;
@@ -45,6 +50,11 @@ export interface ReviewSlideInput {
 export interface QuestionSlideInput {
   question?: string;
   supportingText?: string;
+}
+
+export interface AnswerFeedbackSlideInput {
+  result?: string;
+  message?: string;
 }
 
 export interface CodeSlideInput {

@@ -1,0 +1,37 @@
+{
+  "type": "client",
+  "name": "showAnswerFeedback",
+  "description": "Show immediate visual feedback after evaluating a genuine learner answer. Use correct only for a fully correct answer, not_quite when the core idea is present but incomplete or contains a minor error, and wrong when the answer is materially incorrect. This card must not create an additional retry or reinforcement loop.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    {
+      "id": "result",
+      "type": "string",
+      "description": "The evaluated answer result. Return exactly one of: correct, not_quite, wrong.",
+      "dynamic_variable": "",
+      "constant_value": "",
+      "value_type": "llm_prompt",
+      "required": true,
+      "enum": ["correct", "not_quite", "wrong"]
+    },
+    {
+      "id": "message",
+      "type": "string",
+      "description": "Optional short learner-facing explanation. State what was right or which single detail needs correction. Keep it to one concise sentence and do not include internal scoring.",
+      "dynamic_variable": "",
+      "constant_value": "",
+      "value_type": "llm_prompt",
+      "required": false,
+      "enum": null
+    }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

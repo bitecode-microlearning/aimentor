@@ -18,6 +18,7 @@ import {
 import {
   normalizePresentationItems,
   normalizePresentationText,
+  type AnswerFeedbackSlideInput,
   type CodeSlideInput,
   type LessonPresentationSlide,
   type QuestionSlideInput,
@@ -648,6 +649,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               ...(supportingText ? { supportingText } : {}),
             });
             return "Displayed the exact question for the learner to read.";
+          },
+          showAnswerFeedback: async (payload: AnswerFeedbackSlideInput) => {
+            const result = normalizePresentationText(payload?.result, "", 20).toLowerCase().replace(/[ -]+/g, "_");
+            if (result !== "correct" && result !== "not_quite" && result !== "wrong") {
+              throw new Error("Answer feedback result must be correct, not_quite, or wrong.");
+            }
+            const message = normalizePresentationText(payload?.message, "", 300);
+            onLessonPresentationChange?.({
+              type: "answer_feedback",
+              result,
+              ...(message ? { message } : {}),
+            });
+            return `Displayed ${result.replace("_", " ")} answer feedback. Continue the normal lesson flow without adding a retry loop solely because of this card.`;
           },
           showCodeExample: async (payload: CodeSlideInput) => {
             const code = normalizePresentationText(payload?.code, "", 6000);
