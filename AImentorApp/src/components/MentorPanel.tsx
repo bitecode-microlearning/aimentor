@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Conversation } from "@elevenlabs/client";
+import { Conversation, type DisconnectionDetails } from "@elevenlabs/client";
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
@@ -76,6 +76,20 @@ const formatElapsedTime = (elapsedSeconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
+const getDisconnectMessage = (details: DisconnectionDetails): string | null => {
+  if (details.reason === "user") return null;
+  if (details.reason === "agent") {
+    return details.closeReason?.trim()
+      ? `The AI mentor ended the session: ${details.closeReason.trim()}`
+      : "The AI mentor ended the session.";
+  }
+
+  const providerMessage = details.closeReason?.trim() || details.message?.trim();
+  return providerMessage
+    ? `The mentor connection ended unexpectedly: ${providerMessage}`
+    : "The mentor connection ended unexpectedly. You can restart the session.";
+};
+
 const getTokenDebugMessage = (data: any) => {
   const tokenAvailability = data?.debug?.tokenAvailability as TokenAvailabilityDebug | undefined;
 
@@ -135,6 +149,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const userManuallyMutedRef = useRef(false);
   const lastMentorMessageRef = useRef("");
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
+  const userRequestedEndRef = useRef(false);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
@@ -508,8 +523,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           setSessionElapsedSeconds(0);
           setHasElevenLabsSessionStarted(true);
         },
-        onDisconnect: () => {
-          debugMentorControls("session disconnected");
+        onDisconnect: (details: DisconnectionDetails) => {
+          const disconnectMessage = userRequestedEndRef.current ? null : getDisconnectMessage(details);
+          debugMentorControls("session disconnected", {
+            reason: details.reason,
+            closeCode: "closeCode" in details ? details.closeCode : undefined,
+          });
+          setErrorMessage(disconnectMessage);
+          userRequestedEndRef.current = false;
           resetSessionState("disconnected");
         },
         onError: (error: unknown) => {
@@ -555,6 +576,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (isActionBusy) return;
 
     const conversation = conversationRef.current;
+    userRequestedEndRef.current = true;
     setIsActionBusy(true);
     setMicrophoneMuted(true);
 
@@ -564,6 +586,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       }
       resetSessionState("disconnected");
     } catch (error) {
+      userRequestedEndRef.current = false;
       setErrorMessage(`Failed to end session cleanly: ${getReadableError(error)}`);
       resetSessionState("error");
     }
