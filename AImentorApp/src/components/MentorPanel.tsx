@@ -31,6 +31,7 @@ import {
   type SummarySlideInput,
   type TopicSlideInput,
 } from "../domain/lessonPresentation";
+import { formatSessionTopicHeader } from "./sessionTopicHeader";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -981,6 +982,16 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     return "";
   };
 
+  const statusLabel = getStatusLabel();
+  const activeTopicHeader = lessonPhase && isSessionActive && mentorSessionState !== "connecting"
+    ? formatSessionTopicHeader({
+        current: lessonPhase.current,
+        total: lessonPhase.total,
+        title: lessonPhase.title,
+        status: statusLabel,
+      })
+    : null;
+
   return (
     <div className="mentor-panel-shell relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
@@ -1048,17 +1059,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         <div
           className="mentor-status-bar"
           title={lastMentorMessage || undefined}
+          aria-label={activeTopicHeader?.accessibleLabel || undefined}
         >
           <div className="mentor-status-content">
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
             {mentorSessionState === "connecting" && <div className="mentor-status-spinner" />}
             <div className="mentor-status-text">
-              <p>{lessonPhase && isSessionActive && mentorSessionState !== "connecting"
-                ? `Session topic ${lessonPhase.current}/${lessonPhase.total}: ${lessonPhase.title}`
-                : getStatusLabel()}</p>
-              {lessonPhase && isSessionActive && mentorSessionState !== "connecting" && (
-                <span>{getStatusLabel()}</span>
-              )}
+              <p>{activeTopicHeader?.primary || statusLabel}</p>
+              {activeTopicHeader?.secondary && <span className="mentor-status-secondary">{activeTopicHeader.secondary}</span>}
               {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
                 <span>You muted manually. The app will wait until the next mentor question.</span>
               )}
