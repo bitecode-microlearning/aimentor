@@ -113,6 +113,39 @@ const formatElapsedTime = (elapsedSeconds: number) => {
 const isOpeningReadinessQuestion = (message: string) =>
   /\b(?:are you ready|ready to (?:begin|start|continue)|shall we (?:begin|start))\b/i.test(message);
 
+type AnswerFeedbackResult = "correct" | "not_quite" | "wrong";
+
+async function playAnswerFeedbackSound(result: AnswerFeedbackResult) {
+  const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextConstructor) return;
+
+  const audioContext = new AudioContextConstructor() as AudioContext;
+  if (audioContext.state === "suspended") await audioContext.resume();
+  const patterns = {
+    correct: [{ frequency: 523, offset: 0 }, { frequency: 659, offset: 0.11 }, { frequency: 784, offset: 0.22 }],
+    not_quite: [{ frequency: 440, offset: 0 }, { frequency: 494, offset: 0.17 }],
+    wrong: [{ frequency: 392, offset: 0 }, { frequency: 294, offset: 0.18 }],
+  } satisfies Record<AnswerFeedbackResult, Array<{ frequency: number; offset: number }>>;
+
+  for (const tone of patterns[result]) {
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const start = audioContext.currentTime + tone.offset;
+    const end = start + 0.18;
+    oscillator.type = result === "wrong" ? "triangle" : "sine";
+    oscillator.frequency.setValueAtTime(tone.frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(result === "correct" ? 0.055 : 0.04, start + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+    oscillator.start(start);
+    oscillator.stop(end);
+  }
+
+  window.setTimeout(() => void audioContext.close(), 700);
+}
+
 const getDisconnectMessage = (details: DisconnectionDetails): string | null => {
   if (details.reason === "user") return null;
   if (details.reason === "agent") {
@@ -764,6 +797,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               type: "answer_feedback",
               result,
               ...(message ? { message } : {}),
+            });
+            void playAnswerFeedbackSound(result).catch((error) => {
+              debugMentorControls("answer feedback sound failed", error);
             });
             if (previousReviewActiveRef.current) {
               previousReviewFeedbackCountRef.current += 1;
