@@ -17,6 +17,12 @@ interface MentorPanelProps {
   lessonname?: string;
   content?: string;
   knowledgelevel?: string;
+  knowledgedomain?: string;
+  userpreferences?: string;
+  learningmemory?: string;
+  knowledgestrengths?: string;
+  knowledgegaps?: string;
+  practicerecommendations?: string;
   mentorSessionId?: string;
   userId?: string;
   subscriptionId?: string;
@@ -91,6 +97,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   lessonname,
   content,
   knowledgelevel,
+  knowledgedomain,
+  userpreferences,
+  learningmemory,
+  knowledgestrengths,
+  knowledgegaps,
+  practicerecommendations,
   mentorSessionId,
   userId,
   subscriptionId,
@@ -451,19 +463,30 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         throw new Error("Unable to get a signed mentor session. Please try again later.");
       }
 
-      const idOnlyBootstrap = data?.mentor_context_mode === "id_only";
-      if (idOnlyBootstrap && (!userId || !subscriptionId || !courseId || !lessonId || !mentorSessionId)) {
+      const appResolvedBootstrap = data?.mentor_context_mode === "app_resolved";
+      const activeMentorSessionId = data?.mentor_session_id || mentorSessionId;
+      if (appResolvedBootstrap && (!userId || !subscriptionId || !courseId || !lessonId || !activeMentorSessionId)) {
         throw new Error("This lesson link is missing AI Mentor context IDs. Please open the latest lesson link from your course email.");
       }
 
-      const dynamicVariables = idOnlyBootstrap
+      const dynamicVariables = appResolvedBootstrap
         ? {
             user_id: userId!,
             subscription_id: subscriptionId!,
             course_id: courseId!,
             lesson_id: lessonId!,
-            mentor_session_id: mentorSessionId!,
+            mentor_session_id: activeMentorSessionId,
             userfirstname: userfirstname || "User",
+            coursename: coursename || "Unknown Course",
+            lessonname: lessonname || "Untitled Lesson",
+            knowledgelevel: knowledgelevel || "beginner",
+            knowledgedomain: knowledgedomain || "",
+            userpreferences: userpreferences || "",
+            content: content || "",
+            learningmemory: learningmemory || "[]",
+            knowledgestrengths: knowledgestrengths || "[]",
+            knowledgegaps: knowledgegaps || "[]",
+            practicerecommendations: practicerecommendations || "[]",
           }
         : {
             userfirstname: userfirstname || "User",

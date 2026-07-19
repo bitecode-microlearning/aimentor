@@ -250,13 +250,109 @@ function getUsageExpiresAt(lessonData) {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 }
 
-function withMentorBootstrapMode(body, env) {
+function isIdOnlyLessonPayload(value) {
+  return ["userid", "subscriptionid", "courseid", "lessonid"].every((key) => {
+    const id = Number(value?.[key]);
+    return Number.isInteger(id) && id > 0;
+  });
+}
+
+function bounded(value, maxLength) {
+  return String(value ?? "").trim().slice(0, maxLength);
+}
+
+function parseStringArray(value) {
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string" && item.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
+function uniqueSignals(rows, field, limit = 5) {
+  return [...new Set(rows.flatMap((row) => parseStringArray(row[field])).map((item) => bounded(item, 300)))].slice(0, limit);
+}
+
+async function resolveMentorContext(lessonData, env) {
+  if (!isIdOnlyLessonPayload(lessonData)) return lessonData;
+  const userid = Number(lessonData.userid);
+  const subscriptionid = Number(lessonData.subscriptionid);
+  const courseid = Number(lessonData.courseid);
+  const lessonid = Number(lessonData.lessonid);
+  const context = await env.DB.prepare(
+    `SELECT u.firstname AS userfirstname, s.knowledgelevel, s.knowledgedomain, s.userpreferences,
+            c.name AS coursename, l.lessonname, l.goal, l.contentdescription, l.codedescription,
+            l.concepts, l.avoid
+       FROM users u
+       INNER JOIN subscriptions s ON s.userid = u.id
+       INNER JOIN courses c ON c.id = s.courseid
+       INNER JOIN lessons l ON l.courseid = c.id
+      WHERE u.id = ?1 AND s.id = ?2 AND c.id = ?3 AND l.id = ?4
+        AND u.status = 'active'
+      LIMIT 1`
+  ).bind(userid, subscriptionid, courseid, lessonid).first();
+  if (!context) throw new Error("AI Mentor lesson context was not found for the signed IDs.");
+
+  const history = await env.DB.prepare(
+    `SELECT lh.mentor_session_id, lh.provider_summary,
+            COALESCE(lh.provider_sentiment_label, lh.derived_sentiment_label) AS sentiment_label,
+            la.analysis_summary, la.strengths_json, la.needs_practice_json
+       FROM learning_history lh
+       LEFT JOIN learning_analysis la ON la.id = (
+         SELECT la2.id FROM learning_analysis la2
+          WHERE la2.learning_history_id = lh.id AND la2.status IN ('completed', 'low_quality')
+          ORDER BY la2.analysis_version DESC LIMIT 1
+       )
+      WHERE lh.user_id = ?1 AND lh.course_id = ?2
+      ORDER BY lh.created_at DESC LIMIT 3`
+  ).bind(userid, courseid).all();
+  const suggestions = await env.DB.prepare(
+    `SELECT ls.title, ls.rationale, ls.suggested_action, ls.priority
+       FROM learning_suggestion ls
+       INNER JOIN learning_history lh ON lh.id = ls.learning_history_id
+      WHERE lh.user_id = ?1 AND lh.course_id = ?2
+        AND ls.target_channel = 'mentor' AND ls.status = 'active'
+      ORDER BY ls.priority DESC, ls.created_at DESC LIMIT 3`
+  ).bind(userid, courseid).all();
+
+  const recentSessions = history.results.map((row) => ({
+    summary: bounded(row.analysis_summary || row.provider_summary, 1200),
+    sentiment: bounded(row.sentiment_label, 32) || null,
+  }));
+  const nextSteps = suggestions.results.map((row) => ({
+    title: bounded(row.title, 180),
+    rationale: bounded(row.rationale, 500),
+    action: bounded(row.suggested_action, 500),
+    priority: Math.max(0, Math.min(100, Number(row.priority) || 0)),
+  }));
+  const content = [context.goal, context.contentdescription, context.codedescription, context.concepts]
+    .map((value) => bounded(value, 4000)).filter(Boolean).join("\n\n").slice(0, 8000);
   return {
-    ...body,
-    mentor_context_mode: String(env.MENTOR_ID_ONLY_BOOTSTRAP_ENABLED ?? "").toLowerCase() === "true"
-      ? "id_only"
-      : "legacy_content",
+    userid, subscriptionid, courseid, lessonid,
+    userfirstname: bounded(context.userfirstname || "Learner", 100),
+    coursename: bounded(context.coursename, 200),
+    lessonname: bounded(context.lessonname, 200),
+    knowledgelevel: bounded(context.knowledgelevel, 100),
+    knowledgedomain: bounded(context.knowledgedomain, 500),
+    userpreferences: bounded(context.userpreferences, 1000),
+    content,
+    learningmemory: JSON.stringify(recentSessions),
+    knowledgestrengths: JSON.stringify(uniqueSignals(history.results, "strengths_json")),
+    knowledgegaps: JSON.stringify(uniqueSignals(history.results, "needs_practice_json")),
+    practicerecommendations: JSON.stringify(nextSteps),
+    timestamp: lessonData.timestamp,
   };
+}
+
+async function createMentorSession(context, env) {
+  const mentorSessionId = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO mentor_sessions (id, user_id, subscription_id, course_id, lesson_id, provider, status)
+     VALUES (?1, ?2, ?3, ?4, ?5, 'elevenlabs', 'active')`
+  ).bind(mentorSessionId, context.userid, context.subscriptionid, context.courseid, context.lessonid).run();
+  return mentorSessionId;
 }
 
 function validateUsageRequest(action, lessonData) {
@@ -406,7 +502,8 @@ export default {
           return jsonResponse({ error: result.error }, result.status, corsHeaders);
         }
 
-        return jsonResponse(result.lessonData, 200, corsHeaders);
+        const context = await resolveMentorContext(result.lessonData, env);
+        return jsonResponse(context, 200, corsHeaders);
       } catch (err) {
         return jsonResponse(
           {
@@ -474,6 +571,10 @@ export default {
           return jsonResponse({ success: true }, 200, corsHeaders);
         }
 
+        const resolvedContext = await resolveMentorContext(result.lessonData, env);
+        const idOnlyBootstrap = isIdOnlyLessonPayload(result.lessonData);
+        const mentorSessionId = idOnlyBootstrap ? await createMentorSession(resolvedContext, env) : null;
+
         let tokenAvailability;
 
         try {
@@ -522,7 +623,11 @@ export default {
         }
 
         return jsonResponse(
-          withMentorBootstrapMode(withDebugPayload(data, env, tokenAvailability), env),
+          {
+            ...withDebugPayload(data, env, tokenAvailability),
+            mentor_context_mode: idOnlyBootstrap ? "app_resolved" : "legacy_content",
+            ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
+          },
           res.status,
           corsHeaders
         );

@@ -13,6 +13,12 @@ function App() {
     lessonName: string;
     userfirstname?: string;
     knowledgelevel?: string;
+    knowledgedomain?: string;
+    userpreferences?: string;
+    learningmemory?: string;
+    knowledgestrengths?: string;
+    knowledgegaps?: string;
+    practicerecommendations?: string;
     mentorSessionId?: string;
     userId?: string;
     subscriptionId?: string;
@@ -81,6 +87,12 @@ function App() {
           lessonName: json.lessonname || "Untitled Lesson",
           userfirstname: json.userfirstname || "Unknown User",
           knowledgelevel: json.knowledgelevel || "Beginner",
+          knowledgedomain: json.knowledgedomain || "",
+          userpreferences: json.userpreferences || "",
+          learningmemory: json.learningmemory || "[]",
+          knowledgestrengths: json.knowledgestrengths || "[]",
+          knowledgegaps: json.knowledgegaps || "[]",
+          practicerecommendations: json.practicerecommendations || "[]",
           mentorSessionId: json.mentor_session_id || json.mentorSessionId,
           userId: String(json.userid || json.user_id || json.userId || ""),
           subscriptionId: String(json.subscriptionid || json.subscription_id || json.subscriptionId || ""),
@@ -135,6 +147,12 @@ function App() {
                   lessonname={lessonData.lessonName}
                   content={lessonData.content}
                   knowledgelevel={lessonData.knowledgelevel}
+                  knowledgedomain={lessonData.knowledgedomain}
+                  userpreferences={lessonData.userpreferences}
+                  learningmemory={lessonData.learningmemory}
+                  knowledgestrengths={lessonData.knowledgestrengths}
+                  knowledgegaps={lessonData.knowledgegaps}
+                  practicerecommendations={lessonData.practicerecommendations}
                   mentorSessionId={lessonData.mentorSessionId}
                   userId={lessonData.userId}
                   subscriptionId={lessonData.subscriptionId}
