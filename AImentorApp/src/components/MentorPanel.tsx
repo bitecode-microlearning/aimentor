@@ -10,6 +10,12 @@ import {
 } from "./mentorControls";
 import { Clock, Coffee, MessageSquare, Volume2 } from "lucide-react";
 import buyMeACoffeeCup from "./img/buymeacoffee-cup.gif";
+import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
+import {
+  createLessonEvaluation,
+  type LessonEvaluation,
+  type LessonEvaluationInput,
+} from "../domain/lessonUnderstanding";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -30,6 +36,7 @@ interface MentorPanelProps {
   lessonId?: string;
   signedData?: string;
   signedSig?: string;
+  previousLessonEvaluation?: LessonEvaluation;
 }
 
 type ConversationInstance = {
@@ -124,6 +131,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   lessonId,
   signedData,
   signedSig,
+  previousLessonEvaluation,
 }) => {
   const [mentorSessionState, setMentorSessionState] = useState<MentorControlState>("idle");
   const [isMicMuted, setIsMicMuted] = useState(true);
@@ -138,6 +146,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
   const [mentorVideo] = useState(pickRandomMentorVideo);
+  const [visibleEvaluation, setVisibleEvaluation] = useState<{
+    evaluation: LessonEvaluation;
+    context: "previous" | "current";
+  } | null>(null);
 
   const conversationRef = useRef<ConversationInstance | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
@@ -150,6 +162,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const lastMentorMessageRef = useRef("");
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
   const userRequestedEndRef = useRef(false);
+  const activeMentorSessionIdRef = useRef<string | null>(null);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
@@ -416,6 +429,30 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  const persistLessonEvaluation = async (evaluation: LessonEvaluation) => {
+    if (!signedData || !signedSig || !activeMentorSessionIdRef.current) {
+      throw new Error("The lesson evaluation could not be linked to this mentor session.");
+    }
+    const cfg = await import("../config/workerConfig");
+    const evaluationUrl = cfg.WORKER_AGENT_URL?.replace(/\/agent\/?$/, "/evaluation");
+    if (!evaluationUrl) throw new Error("The lesson evaluation service is unavailable.");
+    const response = await fetch(evaluationUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: signedData,
+        sig: signedSig,
+        mentorSessionId: activeMentorSessionIdRef.current,
+        evaluation,
+      }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      throw new Error(typeof result?.error === "string" ? result.error : "Lesson evaluation could not be saved.");
+    }
+    debugMentorControls("lesson evaluation saved", { status: evaluation.status });
+  };
+
   const handleStartConversation = async () => {
     if (mentorSessionState === "connecting" || isSessionActive) return;
 
@@ -429,6 +466,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setSessionElapsedSeconds(0);
     setHasElevenLabsSessionStarted(false);
     setConnectionStatusMessage("Loading mentor configuration...");
+    setVisibleEvaluation(null);
 
     try {
       let WORKER_AGENT_URL: string | undefined;
@@ -480,6 +518,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       const appResolvedBootstrap = data?.mentor_context_mode === "app_resolved";
       const activeMentorSessionId = data?.mentor_session_id || mentorSessionId;
+      activeMentorSessionIdRef.current = activeMentorSessionId || null;
       if (appResolvedBootstrap && (!userId || !subscriptionId || !courseId || !lessonId || !activeMentorSessionId)) {
         throw new Error("This lesson link is missing AI Mentor context IDs. Please open the latest lesson link from your course email.");
       }
@@ -502,6 +541,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             knowledgestrengths: knowledgestrengths || "[]",
             knowledgegaps: knowledgegaps || "[]",
             practicerecommendations: practicerecommendations || "[]",
+            previous_lesson_evaluation: JSON.stringify(previousLessonEvaluation ?? null),
           }
         : {
             userfirstname: userfirstname || "User",
@@ -551,6 +591,37 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           },
           onEnd: async () => {
             resetSessionState("disconnected");
+          },
+          showPreviousLessonEvaluation: async () => {
+            if (!previousLessonEvaluation) {
+              debugMentorControls("previous lesson evaluation unavailable");
+              return "No previous lesson evaluation is available. Continue without showing a result.";
+            }
+            setVisibleEvaluation({ evaluation: previousLessonEvaluation, context: "previous" });
+            return `Displayed the previous lesson result: ${previousLessonEvaluation.status}. Continue with the recall questions.`;
+          },
+          reportLessonEvaluation: async (payload: LessonEvaluationInput) => {
+            const totalQuestions = Number(payload?.totalQuestions);
+            const correctAnswers = Number(payload?.correctAnswers);
+            if (!Number.isInteger(totalQuestions) || totalQuestions <= 0 || !Number.isInteger(correctAnswers)) {
+              throw new Error("Lesson evaluation requires valid correctAnswers and totalQuestions values.");
+            }
+            const evaluation = createLessonEvaluation({
+              lessonId: String(lessonId || payload.lessonId || ""),
+              lessonName: lessonname || payload.lessonName || "Current lesson",
+              correctAnswers,
+              totalQuestions,
+              skippedAnswers: Number(payload.skippedAnswers ?? 0),
+              uncertaintyDetected: Boolean(payload.uncertaintyDetected),
+              explicitConfusionDetected: Boolean(payload.explicitConfusionDetected),
+            });
+            setVisibleEvaluation({ evaluation, context: "current" });
+            try {
+              await persistLessonEvaluation(evaluation);
+            } catch (error) {
+              debugMentorControls("lesson evaluation persistence failed", getReadableError(error));
+            }
+            return `Displayed and processed the lesson outcome: ${evaluation.status}.`;
           },
         },
       });
@@ -608,6 +679,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     sendMentorInstruction("I'm done answering. Please evaluate my answer and continue.");
   };
 
+  const handleEvaluationContinue = () => {
+    const status = visibleEvaluation?.evaluation.status;
+    setVisibleEvaluation(null);
+    sendMentorInstruction(status === "mastered"
+      ? "I'm ready to continue to the next lesson. Please close this session with a brief encouragement."
+      : "I'm ready to continue. Please close this session with a brief encouragement.");
+  };
+
+  const handleEvaluationReview = () => {
+    setVisibleEvaluation(null);
+    sendMentorInstruction("Please give me one short spoken review of the key takeaway, then let me continue.");
+  };
+
   const handleCancelAsk = () => {
     userManuallyMutedRef.current = true;
     setUserManuallyMuted(true);
@@ -650,6 +734,24 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       </div>
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+
+      {visibleEvaluation && (
+        <div className={`lesson-understanding-layer is-${visibleEvaluation.context}`}>
+          <LessonUnderstandingStatusCard
+            lessonName={visibleEvaluation.evaluation.lessonName}
+            status={visibleEvaluation.evaluation.status}
+            context={visibleEvaluation.context}
+            compact={visibleEvaluation.context === "previous"}
+            onContinue={visibleEvaluation.context === "current" ? handleEvaluationContinue : undefined}
+            onReview={visibleEvaluation.context === "current" ? handleEvaluationReview : undefined}
+          />
+          {visibleEvaluation.context === "previous" && (
+            <button type="button" className="lesson-understanding-dismiss" onClick={() => setVisibleEvaluation(null)}>
+              Continue
+            </button>
+          )}
+        </div>
+      )}
 
       {isTokenSupportScreenVisible && (
         <div className="absolute inset-0 z-30 overflow-y-auto bg-[#F6F6F6] px-7 py-6 sm:px-12">

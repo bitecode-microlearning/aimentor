@@ -2614,3 +2614,206 @@ html {
   box-shadow: 0 0 14px rgba(0, 206, 141, .9) !important;
   transition: width .7s ease-out !important;
 }
+
+.lesson-understanding-layer {
+  position: absolute;
+  z-index: 24;
+  display: flex;
+  gap: 10px;
+}
+
+.lesson-understanding-layer.is-previous {
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  align-items: flex-end;
+  flex-direction: column;
+}
+
+.lesson-understanding-layer.is-current {
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(24, 32, 38, .68);
+  backdrop-filter: blur(6px);
+}
+
+.lesson-understanding-card {
+  --understanding-accent: #1376c8;
+  width: min(100%, 610px);
+  padding: 24px;
+  color: #333;
+  background: rgba(255, 255, 255, .98);
+  border: 1px solid #ddd8d2;
+  border-top: 4px solid var(--understanding-accent);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(20, 32, 49, .2);
+  animation: lesson-understanding-enter .24s ease-out both;
+}
+
+.lesson-understanding-card.is-compact {
+  width: min(100%, 470px);
+  padding: 16px;
+}
+
+.lesson-understanding-mastered { --understanding-accent: #fe9613; }
+.lesson-understanding-understood { --understanding-accent: #00a976; }
+.lesson-understanding-needs_review { --understanding-accent: #1376c8; }
+
+.lesson-understanding-eyebrow {
+  margin: 0 0 5px;
+  color: #666;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.lesson-understanding-card h2 {
+  margin: 0;
+  color: #333;
+  font-size: clamp(1.15rem, 2.3vw, 1.55rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.lesson-understanding-result {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 18px;
+}
+
+.is-compact .lesson-understanding-result { margin-top: 12px; }
+
+.lesson-understanding-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--understanding-accent);
+  border-radius: 10px;
+}
+
+.is-compact .lesson-understanding-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.lesson-understanding-result strong {
+  display: block;
+  color: var(--understanding-accent);
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.lesson-understanding-result p {
+  margin: 3px 0 0;
+  color: #555;
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.lesson-understanding-track {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-understanding-track li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 7px;
+  color: #777;
+  background: #f3f3f3;
+  border: 1px solid #e4e0dc;
+  border-radius: 8px;
+  font-size: .76rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lesson-understanding-track li.is-active {
+  color: #fff;
+  background: var(--understanding-accent);
+  border-color: var(--understanding-accent);
+}
+
+.lesson-understanding-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.lesson-understanding-actions button,
+.lesson-understanding-dismiss {
+  min-height: 44px;
+  padding: 0 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 750;
+}
+
+.lesson-understanding-primary {
+  color: #fff;
+  background: var(--understanding-accent);
+}
+
+.lesson-understanding-secondary {
+  color: #333;
+  background: #fff;
+  border-color: #ccc !important;
+}
+
+.lesson-understanding-actions button:focus-visible,
+.lesson-understanding-dismiss:focus-visible {
+  outline: 3px solid rgba(19, 118, 200, .35);
+  outline-offset: 2px;
+}
+
+.lesson-understanding-actions p {
+  width: 100%;
+  margin: 0;
+  color: #666;
+  font-size: .82rem;
+}
+
+.lesson-understanding-dismiss {
+  color: #fff;
+  background: #1376c8;
+  box-shadow: 0 8px 20px rgba(20, 32, 49, .18);
+}
+
+@keyframes lesson-understanding-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 560px) {
+  .lesson-understanding-layer.is-current { padding: 12px; }
+  .lesson-understanding-card { padding: 18px; }
+  .lesson-understanding-result { align-items: flex-start; }
+  .lesson-understanding-track { grid-template-columns: 1fr; }
+  .lesson-understanding-track li { justify-content: flex-start; }
+  .lesson-understanding-actions { align-items: stretch; flex-direction: column; }
+  .lesson-understanding-actions button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lesson-understanding-card { animation: none; }
+}

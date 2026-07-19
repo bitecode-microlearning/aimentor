@@ -164,6 +164,7 @@ async function getRequestPayload(request, searchParams) {
     return {
       encoded: body.data,
       signature: body.sig,
+      body,
     };
   }
 
@@ -316,6 +317,20 @@ async function resolveMentorContext(lessonData, env) {
         AND ls.target_channel = 'mentor' AND ls.status = 'active'
       ORDER BY ls.priority DESC, ls.created_at DESC LIMIT 3`
   ).bind(userid, courseid).all();
+  const previousEvaluation = await env.DB.prepare(
+    `SELECT ms.lesson_id, l.lessonname, ms.understanding_status,
+            ms.validation_correct_answers, ms.validation_total_questions,
+            ms.validation_skipped_answers, ms.uncertainty_detected,
+            ms.explicit_confusion_detected, ms.evaluated_at
+       FROM mentor_sessions ms
+       INNER JOIN lessons l ON l.id = ms.lesson_id
+      WHERE ms.user_id = ?1 AND ms.course_id = ?2
+        AND ms.status = 'completed'
+        AND ms.understanding_status IS NOT NULL
+        AND ms.evaluated_at IS NOT NULL
+      ORDER BY ms.evaluated_at DESC, ms.created_at DESC
+      LIMIT 1`
+  ).bind(userid, courseid).first();
 
   const recentSessions = history.results.map((row) => ({
     summary: bounded(row.analysis_summary || row.provider_summary, 1200),
@@ -342,8 +357,104 @@ async function resolveMentorContext(lessonData, env) {
     knowledgestrengths: JSON.stringify(uniqueSignals(history.results, "strengths_json")),
     knowledgegaps: JSON.stringify(uniqueSignals(history.results, "needs_practice_json")),
     practicerecommendations: JSON.stringify(nextSteps),
+    ...(previousEvaluation ? {
+      previouslessonevaluation: {
+        lessonId: String(previousEvaluation.lesson_id),
+        lessonName: bounded(previousEvaluation.lessonname, 200),
+        status: previousEvaluation.understanding_status,
+        correctAnswers: Number(previousEvaluation.validation_correct_answers),
+        totalQuestions: Number(previousEvaluation.validation_total_questions),
+        skippedAnswers: Number(previousEvaluation.validation_skipped_answers) || 0,
+        uncertaintyDetected: Boolean(previousEvaluation.uncertainty_detected),
+        explicitConfusionDetected: Boolean(previousEvaluation.explicit_confusion_detected),
+        evaluatedAt: previousEvaluation.evaluated_at,
+      },
+    } : {}),
     timestamp: lessonData.timestamp,
   };
+}
+
+const UNDERSTANDING_STATUSES = new Set(["mastered", "understood", "needs_review"]);
+
+function calculateUnderstandingStatus(value) {
+  const correctPercentage = (value.correctAnswers / value.totalQuestions) * 100;
+  if (value.skippedAnswers >= value.totalQuestions || value.explicitConfusionDetected) return "needs_review";
+  if (correctPercentage >= 80 && !value.uncertaintyDetected) return "mastered";
+  if (correctPercentage >= 50) return "understood";
+  return "needs_review";
+}
+
+function normalizeLessonEvaluation(value, lessonData) {
+  const correctAnswers = Number(value?.correctAnswers);
+  const totalQuestions = Number(value?.totalQuestions);
+  const skippedAnswers = Number(value?.skippedAnswers ?? 0);
+  const requestedStatus = String(value?.status ?? "");
+  if (!UNDERSTANDING_STATUSES.has(requestedStatus)) throw new Error("Invalid lesson understanding status.");
+  if (!Number.isInteger(correctAnswers) || correctAnswers < 0) throw new Error("Invalid correct answer count.");
+  if (!Number.isInteger(totalQuestions) || totalQuestions <= 0) throw new Error("Invalid total question count.");
+  if (correctAnswers > totalQuestions) throw new Error("Correct answers cannot exceed total questions.");
+  if (!Number.isInteger(skippedAnswers) || skippedAnswers < 0 || skippedAnswers > totalQuestions) {
+    throw new Error("Invalid skipped answer count.");
+  }
+  if (correctAnswers + skippedAnswers > totalQuestions) throw new Error("Answered and skipped counts exceed total questions.");
+
+  const signals = {
+    correctAnswers,
+    totalQuestions,
+    skippedAnswers,
+    uncertaintyDetected: Boolean(value?.uncertaintyDetected),
+    explicitConfusionDetected: Boolean(value?.explicitConfusionDetected),
+  };
+  const status = calculateUnderstandingStatus(signals);
+  if (requestedStatus !== status) throw new Error("Lesson understanding status does not match the evaluation evidence.");
+
+  return {
+    lessonId: Number(lessonData.lessonid),
+    lessonName: bounded(value?.lessonName, 200),
+    status,
+    correctAnswers,
+    totalQuestions,
+    skippedAnswers,
+    uncertaintyDetected: signals.uncertaintyDetected,
+    explicitConfusionDetected: signals.explicitConfusionDetected,
+    evaluatedAt: new Date().toISOString(),
+  };
+}
+
+async function saveLessonEvaluation(input, lessonData, env) {
+  const mentorSessionId = bounded(input?.mentorSessionId, 100);
+  if (!mentorSessionId) throw new Error("Missing mentor session ID.");
+  const evaluation = normalizeLessonEvaluation(input?.evaluation, lessonData);
+  const result = await env.DB.prepare(
+    `UPDATE mentor_sessions
+        SET understanding_status = ?2,
+            validation_correct_answers = ?3,
+            validation_total_questions = ?4,
+            validation_skipped_answers = ?5,
+            uncertainty_detected = ?6,
+            explicit_confusion_detected = ?7,
+            evaluated_at = ?8,
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?1
+        AND user_id = ?9 AND subscription_id = ?10
+        AND course_id = ?11 AND lesson_id = ?12
+        AND status IN ('created', 'active')`
+  ).bind(
+    mentorSessionId,
+    evaluation.status,
+    evaluation.correctAnswers,
+    evaluation.totalQuestions,
+    evaluation.skippedAnswers,
+    evaluation.uncertaintyDetected ? 1 : 0,
+    evaluation.explicitConfusionDetected ? 1 : 0,
+    evaluation.evaluatedAt,
+    Number(lessonData.userid),
+    Number(lessonData.subscriptionid),
+    Number(lessonData.courseid),
+    Number(lessonData.lessonid)
+  ).run();
+  if (result.meta.changes !== 1) throw new Error("Mentor session was not available for evaluation.");
+  return evaluation;
 }
 
 async function createMentorSession(context, env) {
@@ -495,7 +606,7 @@ export default {
       if (envError) return envError;
 
       try {
-        const { encoded, signature } = await getRequestPayload(request, searchParams);
+        const { encoded, signature, body } = await getRequestPayload(request, searchParams);
         const result = await validateSignedLessonPayload(encoded, signature, env);
 
         if (result.error) {
@@ -516,7 +627,7 @@ export default {
       }
     }
 
-    if (pathname === "/agent" || pathname === "/usage") {
+    if (pathname === "/agent" || pathname === "/usage" || pathname === "/evaluation") {
       const requiredEnv = [
         "HMAC_SECRET",
         "DB",
@@ -530,11 +641,19 @@ export default {
       if (envError) return envError;
 
       try {
-        const { encoded, signature } = await getRequestPayload(request, searchParams);
+        const { encoded, signature, body } = await getRequestPayload(request, searchParams);
         const result = await validateSignedLessonPayload(encoded, signature, env);
 
         if (result.error) {
           return jsonResponse({ error: result.error }, result.status, corsHeaders);
+        }
+
+        if (pathname === "/evaluation") {
+          if (!isIdOnlyLessonPayload(result.lessonData)) {
+            return jsonResponse({ error: "Lesson evaluation requires an ID-only mentor link." }, 400, corsHeaders);
+          }
+          const evaluation = await saveLessonEvaluation(body, result.lessonData, env);
+          return jsonResponse({ success: true, evaluation }, 200, corsHeaders);
         }
 
         const action = pathname === "/agent" ? "check_aimentor_usage" : "update_aimentor_usage";

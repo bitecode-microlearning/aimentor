@@ -5,6 +5,7 @@ import { Header } from "./components/Header";
 import  MentorPanel from "./components/MentorPanel";
 import { LessonContent } from "./components/LessonContent"; // ✅ named import
 import { Footer } from "./components/Footer";
+import { parseLessonEvaluation, type LessonEvaluation } from "./domain/lessonUnderstanding";
 
 function App() {
   // 🔹 State for lesson data
@@ -27,6 +28,7 @@ function App() {
     content?: string;
     signedData?: string;
     signedSig?: string;
+    previousLessonEvaluation?: LessonEvaluation;
     sections: Array<{ title: string; content: string; type?: "text" | "code" | "tip" }>;
   }>({
     courseName: "Loading...",
@@ -101,6 +103,7 @@ function App() {
           content: json.content || "<p>No content available.</p>",
           signedData: data,
           signedSig: sig,
+          previousLessonEvaluation: parseLessonEvaluation(json.previouslessonevaluation) ?? undefined,
 
           sections: [
             {
@@ -160,6 +163,7 @@ function App() {
                   lessonId={lessonData.lessonId}
                   signedData={lessonData.signedData}
                   signedSig={lessonData.signedSig}
+                  previousLessonEvaluation={lessonData.previousLessonEvaluation}
                 />
               </div>
             </div>
