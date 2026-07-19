@@ -5,7 +5,6 @@ import { MentorControlBar } from "./MentorControlBar";
 import {
   debugMentorControls,
   getReadableError,
-  isMentorAskingQuestion,
   type MentorControlState,
 } from "./mentorControls";
 import { Clock, Coffee, MessageSquare, Volume2 } from "lucide-react";
@@ -18,6 +17,7 @@ import {
 import {
   normalizePresentationItems,
   normalizePresentationText,
+  normalizeTrueFalseQuestion,
   type AnswerFeedbackSlideInput,
   type CodeSlideInput,
   type LessonPresentationSlide,
@@ -345,13 +345,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (nextMode === "listening") {
       if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
 
-      if (isMentorAskingQuestion(lastMentorMessageRef.current)) {
-        userManuallyMutedRef.current = false;
-        setUserManuallyMuted(false);
-        setControlState("mentor_waiting_for_answer");
-      } else {
-        setControlState("muted_waiting");
-      }
+      // ElevenLabs listening mode is the authoritative signal that the learner
+      // may speak. Transcript wording is not reliable enough to gate the mic.
+      userManuallyMutedRef.current = false;
+      setUserManuallyMuted(false);
+      setControlState("mentor_waiting_for_answer");
       return;
     }
 
@@ -650,7 +648,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             return "Displayed the explanation question. Speak the exact question now without any intervening words.";
           },
           showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
-            const question = normalizePresentationText(payload?.question, "", 600);
+            const question = normalizeTrueFalseQuestion(payload?.question);
             if (!question) throw new Error("True-or-false question text is required.");
             onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
             return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
@@ -806,7 +804,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn";
     if (mentorSessionState === "user_question_mode") return "Listening to your question...";
     if (mentorSessionState === "user_speaking") return "Listening to your answer...";
-    if (mentorSessionState === "muted_waiting") return "Mentor is paused";
+    if (mentorSessionState === "muted_waiting") return "Microphone muted";
     if (mentorSessionState === "error") return "Mentor session error";
     if (mentorSessionState === "disconnected") return "Mentor session ended";
     return "";

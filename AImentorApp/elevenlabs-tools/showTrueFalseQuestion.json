@@ -5,7 +5,7 @@
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [
-    { "id": "question", "type": "string", "description": "Only the exact true-or-false statement/question that will be spoken next. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+    { "id": "question", "type": "string", "description": "Only the statement itself. Never begin or end with True or false because the card already displays that heading. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

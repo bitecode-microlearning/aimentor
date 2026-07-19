@@ -77,6 +77,15 @@ export function normalizePresentationText(value: unknown, fallback = "", maxLeng
   return (normalized || fallback).slice(0, maxLength);
 }
 
+export function normalizeTrueFalseQuestion(value: unknown): string {
+  const question = normalizePresentationText(value, "", 600)
+    .replace(/^\s*true\s*(?:or|\/)\s*false\s*[:?\-–—]*\s*/i, "")
+    .replace(/\s*[,;:.\-–—]*\s*true\s*(?:or|\/)\s*false\s*\?*\s*$/i, "")
+    .trim();
+
+  return question;
+}
+
 export function normalizePresentationItems(value: unknown, maxItems = 6): string[] {
   let candidate = value;
   if (typeof candidate === "string") {
