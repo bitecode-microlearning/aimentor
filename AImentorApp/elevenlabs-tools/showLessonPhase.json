@@ -1,11 +1,11 @@
 {
   "type": "client",
   "name": "showLessonPhase",
-  "description": "Notify BiteCode that the lesson entered one fixed workflow phase. Send only the phase identifier; BiteCode owns and calculates the phase order, total, and learner-facing label. Call once at the start of a phase and never repeat the same phase.",
+  "description": "Notify BiteCode that the lesson entered one fixed workflow phase after introduction. BiteCode automatically starts at Introduction, so never call this tool for introduction. Send only the new phase identifier; BiteCode owns the order, total, and label. Call once at the start of a later phase and never repeat it.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [
-    { "id": "phase", "type": "string", "description": "Fixed phase identifier. Use exactly one of: introduction, previous_lesson_review, calibration, main_lesson, knowledge_check, session_wrap_up.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": ["introduction", "previous_lesson_review", "calibration", "main_lesson", "knowledge_check", "session_wrap_up"] }
+    { "id": "phase", "type": "string", "description": "Fixed later-phase identifier. Use exactly one of: previous_lesson_review, calibration, main_lesson, knowledge_check, session_wrap_up. Never send introduction.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": ["previous_lesson_review", "calibration", "main_lesson", "knowledge_check", "session_wrap_up"] }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

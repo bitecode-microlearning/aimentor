@@ -54,6 +54,13 @@ interface MentorPanelProps {
   onLessonPresentationChange?: (slide: LessonPresentationSlide | null) => void;
 }
 
+const INITIAL_LESSON_PHASE: LessonPhase = {
+  id: "introduction",
+  current: 1,
+  total: 6,
+  title: "Introduction",
+};
+
 type ConversationInstance = {
   endSession?: () => Promise<void> | void;
   setMicMuted?: (muted: boolean) => Promise<void> | void;
@@ -494,6 +501,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
     setTokenSupportDebugMessage("");
+    setLessonPhase(INITIAL_LESSON_PHASE);
     setControlState("connecting");
     setIsMicMuted(true);
     sessionStartedAtRef.current = null;
