@@ -922,10 +922,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           loop
           playsInline
           className="h-full w-full object-cover object-top lg:object-contain lg:object-center"
-          style={{
-            filter: isSessionActive ? "brightness(0.72)" : "brightness(1)",
-            transition: "filter 0.3s ease",
-          }}
           onError={(event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
             debugMentorControls("mentor video failed to load", (event.target as HTMLVideoElement).currentSrc);
           }}
