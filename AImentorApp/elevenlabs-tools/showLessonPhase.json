@@ -1,0 +1,20 @@
+{
+  "type": "client",
+  "name": "showLessonPhase",
+  "description": "Update the compact BiteCode mentor status label when the lesson moves to a new planned phase. Call once at the start of each phase, before speaking its content. Do not call for minor transitions or repeat the same phase.",
+  "expects_response": true,
+  "response_timeout_secs": 5,
+  "parameters": [
+    { "id": "current", "type": "integer", "description": "One-based current phase number, such as 1.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "total", "type": "integer", "description": "Total number of planned lesson phases. Keep this value stable throughout the call and no greater than 10.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null },
+    { "id": "title", "type": "string", "description": "Short learner-facing phase label, ideally two to five words, such as Calibration questions, Core concept, Guided example, Understanding check, or Wrap-up.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+  ],
+  "dynamic_variables": { "dynamic_variable_placeholders": {} },
+  "assignments": [],
+  "interruption_mode": "disable_during_tool",
+  "pre_tool_speech": "off",
+  "tool_call_sound": null,
+  "tool_call_sound_behavior": "auto",
+  "execution_mode": "immediate",
+  "response_mocks": []
+}

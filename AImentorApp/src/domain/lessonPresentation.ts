@@ -72,6 +72,18 @@ export interface SummarySlideInput {
   encouragement?: string;
 }
 
+export interface LessonPhaseInput {
+  current?: unknown;
+  total?: unknown;
+  title?: unknown;
+}
+
+export interface LessonPhase {
+  current: number;
+  total: number;
+  title: string;
+}
+
 export function normalizePresentationText(value: unknown, fallback = "", maxLength = 1000): string {
   const normalized = String(value ?? "").trim();
   return (normalized || fallback).slice(0, maxLength);
@@ -84,6 +96,18 @@ export function normalizeTrueFalseQuestion(value: unknown): string {
     .trim();
 
   return question;
+}
+
+export function normalizeLessonPhase(input: LessonPhaseInput): LessonPhase | null {
+  const current = Number(input?.current);
+  const total = Number(input?.total);
+  const title = normalizePresentationText(input?.title, "", 80);
+
+  if (!Number.isInteger(current) || !Number.isInteger(total) || current < 1 || total < 1 || total > 10 || current > total || !title) {
+    return null;
+  }
+
+  return { current, total, title };
 }
 
 export function normalizePresentationItems(value: unknown, maxItems = 6): string[] {

@@ -16,11 +16,14 @@ import {
 } from "../domain/lessonUnderstanding";
 import {
   normalizePresentationItems,
+  normalizeLessonPhase,
   normalizePresentationText,
   normalizeTrueFalseQuestion,
   type AnswerFeedbackSlideInput,
   type CodeSlideInput,
   type LessonPresentationSlide,
+  type LessonPhase,
+  type LessonPhaseInput,
   type QuestionSlideInput,
   type ReviewSlideInput,
   type SummarySlideInput,
@@ -158,6 +161,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [hasElevenLabsSessionStarted, setHasElevenLabsSessionStarted] = useState(false);
   const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
+  const [lessonPhase, setLessonPhase] = useState<LessonPhase | null>(null);
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
   const [mentorVideo] = useState(pickRandomMentorVideo);
   const conversationRef = useRef<ConversationInstance | null>(null);
@@ -264,6 +268,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
     setConnectionStatusMessage("");
+    setLessonPhase(null);
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
     clearProgressTimer();
@@ -623,6 +628,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             finalizeLessonPresentation();
             resetSessionState("disconnected");
           },
+          showLessonPhase: async (payload: LessonPhaseInput) => {
+            const phase = normalizeLessonPhase(payload);
+            if (!phase) throw new Error("Lesson phase requires a valid current number, total number, and short title.");
+            setLessonPhase(phase);
+            return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
+          },
           showLessonTopic: async (payload: TopicSlideInput) => {
             const title = normalizePresentationText(payload?.title, lessonname || "Current topic", 180);
             const points = normalizePresentationItems(payload?.points);
@@ -886,7 +897,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
             {mentorSessionState === "connecting" && <div className="mentor-status-spinner" />}
             <div className="mentor-status-text">
-              <p>{getStatusLabel()}</p>
+              <p>{lessonPhase && isSessionActive && mentorSessionState !== "connecting"
+                ? `Session topic ${lessonPhase.current}/${lessonPhase.total}: ${lessonPhase.title}`
+                : getStatusLabel()}</p>
+              {lessonPhase && isSessionActive && mentorSessionState !== "connecting" && (
+                <span>{getStatusLabel()}</span>
+              )}
               {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
                 <span>You muted manually. The app will wait until the next mentor question.</span>
               )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePresentationItems, normalizePresentationText, normalizeTrueFalseQuestion } from "./lessonPresentation";
+import { normalizeLessonPhase, normalizePresentationItems, normalizePresentationText, normalizeTrueFalseQuestion } from "./lessonPresentation";
 
 describe("lesson presentation input normalization", () => {
   it("normalizes JSON and newline-delimited item lists", () => {
@@ -22,5 +22,16 @@ describe("normalizeTrueFalseQuestion", () => {
   it("removes a duplicated true-or-false suffix", () => {
     expect(normalizeTrueFalseQuestion("A function can mutate an input. True or false?"))
       .toBe("A function can mutate an input");
+  });
+});
+
+describe("normalizeLessonPhase", () => {
+  it("accepts a bounded lesson phase", () => {
+    expect(normalizeLessonPhase({ current: 1, total: 5, title: "Calibration questions" }))
+      .toEqual({ current: 1, total: 5, title: "Calibration questions" });
+  });
+
+  it("rejects invalid phase progress", () => {
+    expect(normalizeLessonPhase({ current: 6, total: 5, title: "Wrap-up" })).toBeNull();
   });
 });
