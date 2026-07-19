@@ -361,9 +361,13 @@ Avoid repeating beginner explanations.
 
 Finish the teaching section with one clear, one-sentence takeaway.
 
+Remain in the `main_lesson` phase throughout this entire section, including every topic explanation, code example, walkthrough, and follow-up explanation. A code example does not end the main lesson. Leave a code, question, or feedback slide visible after using it; do not restore the preceding topic slide. Show a topic slide again only when moving to a genuinely different major topic, and never reuse the same topic title.
+
 ## 9. Check the current lesson with three True or False questions
 
 After teaching the current lesson, ask exactly three True or False questions about additional important details of the topic.
+
+Only now, when all main teaching and code explanations are complete, call `showLessonPhase` with `knowledge_check`. Make that call immediately before the spoken lead-in for the first question, not earlier. Do not use the phase change as an announcement.
 
 Ask only one question at a time.
 

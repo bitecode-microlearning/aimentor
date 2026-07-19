@@ -124,7 +124,7 @@ async function playAnswerFeedbackSound(result: AnswerFeedbackResult) {
   if (audioContext.state === "suspended") await audioContext.resume();
   const patterns = {
     correct: [{ frequency: 523, offset: 0 }, { frequency: 659, offset: 0.11 }, { frequency: 784, offset: 0.22 }],
-    not_quite: [{ frequency: 440, offset: 0 }, { frequency: 494, offset: 0.17 }],
+    not_quite: [{ frequency: 392, offset: 0 }, { frequency: 294, offset: 0.18 }],
     wrong: [{ frequency: 392, offset: 0 }, { frequency: 294, offset: 0.18 }],
   } satisfies Record<AnswerFeedbackResult, Array<{ frequency: number; offset: number }>>;
 
@@ -133,10 +133,10 @@ async function playAnswerFeedbackSound(result: AnswerFeedbackResult) {
     const gain = audioContext.createGain();
     const start = audioContext.currentTime + tone.offset;
     const end = start + 0.18;
-    oscillator.type = result === "wrong" ? "triangle" : "sine";
+    oscillator.type = result === "correct" ? "sine" : "triangle";
     oscillator.frequency.setValueAtTime(tone.frequency, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(result === "correct" ? 0.0605 : 0.044, start + 0.025);
+    gain.gain.exponentialRampToValueAtTime(result === "correct" ? 0.09075 : 0.066, start + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, end);
     oscillator.connect(gain);
     gain.connect(audioContext.destination);
@@ -237,6 +237,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const previousReviewActiveRef = useRef(false);
   const previousReviewFeedbackCountRef = useRef(0);
   const deferredLessonPhaseRef = useRef<LessonPhase | null>(null);
+  const pendingKnowledgeCheckPhaseRef = useRef<LessonPhase | null>(null);
+  const lastDisplayedTopicTitleRef = useRef("");
   const learnerAnswerExpectedRef = useRef(false);
   const automaticContinuationInFlightRef = useRef(false);
 
@@ -336,6 +338,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     previousReviewActiveRef.current = false;
     previousReviewFeedbackCountRef.current = 0;
     deferredLessonPhaseRef.current = null;
+    pendingKnowledgeCheckPhaseRef.current = null;
+    lastDisplayedTopicTitleRef.current = "";
     learnerAnswerExpectedRef.current = false;
     automaticContinuationInFlightRef.current = false;
     sessionStartedAtRef.current = null;
@@ -616,6 +620,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     previousReviewActiveRef.current = false;
     previousReviewFeedbackCountRef.current = 0;
     deferredLessonPhaseRef.current = null;
+    pendingKnowledgeCheckPhaseRef.current = null;
+    lastDisplayedTopicTitleRef.current = "";
     setControlState("connecting");
     setIsMicMuted(true);
     sessionStartedAtRef.current = null;
@@ -770,12 +776,22 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               return "Calibration phase received early and queued. Keep the previous lesson review active until both review answers have feedback.";
             }
 
+            if (phase.id === "knowledge_check") {
+              pendingKnowledgeCheckPhaseRef.current = phase;
+              return "Knowledge check phase queued. The header will advance when its first question is displayed.";
+            }
+
             applyLessonPhase(phase);
             return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
           },
           showLessonTopic: async (payload: TopicSlideInput) => {
             const title = normalizePresentationText(payload?.title, lessonname || "Current topic", 180);
+            const normalizedTitle = title.trim().toLocaleLowerCase();
+            if (normalizedTitle === lastDisplayedTopicTitleRef.current) {
+              return "This topic was already displayed. Kept the current code, question, or feedback slide visible.";
+            }
             const points = normalizePresentationItems(payload?.points);
+            lastDisplayedTopicTitleRef.current = normalizedTitle;
             onLessonPresentationChange?.({ type: "topic", title, points });
             return "Displayed the current topic in the lesson presentation area.";
           },
@@ -795,6 +811,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Mentor question text is required.");
+            if (pendingKnowledgeCheckPhaseRef.current) {
+              applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
+              pendingKnowledgeCheckPhaseRef.current = null;
+            }
             learnerAnswerExpectedRef.current = true;
             onLessonPresentationChange?.({
               type: "question",
@@ -806,6 +826,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizeTrueFalseQuestion(payload?.question);
             if (!question) throw new Error("True-or-false question text is required.");
+            if (pendingKnowledgeCheckPhaseRef.current) {
+              applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
+              pendingKnowledgeCheckPhaseRef.current = null;
+            }
             learnerAnswerExpectedRef.current = true;
             onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
             return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
@@ -813,6 +837,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showExplanationQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Explanation question text is required.");
+            if (pendingKnowledgeCheckPhaseRef.current) {
+              applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
+              pendingKnowledgeCheckPhaseRef.current = null;
+            }
             learnerAnswerExpectedRef.current = true;
             onLessonPresentationChange?.({ type: "question", questionKind: "explanation", question });
             return "Displayed the explanation question. Speak the exact question now without any intervening words.";
