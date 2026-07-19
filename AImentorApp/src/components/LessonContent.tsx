@@ -56,6 +56,35 @@ interface LessonContentProps {
   presentationSlide?: LessonPresentationSlide | null;
 }
 
+function renderInlineFormatting(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={index}>{part.slice(2, -2)}</strong>
+      : <React.Fragment key={index}>{part}</React.Fragment>,
+  );
+}
+
+function RichFormattedLessonText({ content, type, title }: { content: string; type?: LessonSection['type']; title: string }) {
+  const plainText = plainLessonText(content);
+  const text = title === 'Topic overview'
+    ? plainText.replace(/^Week\s+\d+\s+topic\s*:\s*/i, '**This week:** ')
+    : plainText;
+  if (type === 'code') return <pre className="lesson-content-code"><code>{text}</code></pre>;
+
+  if (title === 'Topic overview') {
+    const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z])/).map((item) => item.trim()).filter(Boolean);
+    const [introduction, ...details] = sentences;
+    return (
+      <div className="lesson-content-formatted lesson-topic-overview">
+        {introduction && <p className="lesson-topic-introduction">{renderInlineFormatting(introduction)}</p>}
+        {details.length > 0 && <ul>{details.map((item, index) => <li key={index}>{renderInlineFormatting(item)}</li>)}</ul>}
+      </div>
+    );
+  }
+
+  return <FormattedLessonText content={text} type={type} />;
+}
+
 export function LessonContent({ lessonName, sections, lessonEvaluation, presentationSlide }: LessonContentProps) {
   return (
     <div className="lesson-content-panel space-y-6">
@@ -83,10 +112,10 @@ export function LessonContent({ lessonName, sections, lessonEvaluation, presenta
             <div className="flex items-start gap-3 mb-3">
               {section.type === 'code' && <Code className="text-[#1376C8] flex-shrink-0 mt-1" size={24} />}
               {section.type === 'tip' && <Lightbulb className="text-[#00CE8D] flex-shrink-0 mt-1" size={24} />}
-              {!section.type && <CheckCircle2 className="text-[#1376C8] flex-shrink-0 mt-1" size={24} />}
+              {section.type === 'text' && <CheckCircle2 className="text-[#1376C8] flex-shrink-0 mt-1" size={24} />}
               <div className="flex-1">
                 <h3 className="mt-0 mb-3">{section.title}</h3>
-                <FormattedLessonText content={section.content} type={section.type} />
+                <RichFormattedLessonText content={section.content} type={section.type} title={section.title} />
               </div>
             </div>
           </Card>

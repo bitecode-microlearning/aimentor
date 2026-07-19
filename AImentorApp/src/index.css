@@ -2785,6 +2785,12 @@ html {
 .lesson-content-formatted p:last-child { margin-bottom: 0; }
 .lesson-content-formatted ul { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
 .lesson-content-formatted li::marker { color: #00a976; }
+.lesson-content-formatted strong { color: #1376c8; font-weight: 800; }
+.lesson-topic-overview { display: grid; gap: 16px; }
+.lesson-topic-overview .lesson-topic-introduction { margin: 0; padding: 13px 16px; color: #263442; background: #eef7ff; border-left: 4px solid #1376c8; border-radius: 0 9px 9px 0; }
+.lesson-topic-overview ul { gap: 10px; margin: 0; padding-left: 0; list-style: none; }
+.lesson-topic-overview li { position: relative; padding: 10px 14px 10px 38px; background: #f8fafb; border: 1px solid #e4eaee; border-radius: 9px; }
+.lesson-topic-overview li::before { position: absolute; top: 13px; left: 14px; width: 11px; height: 11px; content: ""; background: #00a976; border: 3px solid #d9f7ed; border-radius: 999px; box-sizing: content-box; }
 .lesson-content-code { margin: 0; padding: 16px; overflow-x: auto; color: #e8edf2; background: #1e1e1e; border-radius: 10px; font-family: "Cascadia Code", Consolas, monospace; font-size: .88rem; line-height: 1.6; white-space: pre-wrap; }
 
 .lesson-understanding-actions {
