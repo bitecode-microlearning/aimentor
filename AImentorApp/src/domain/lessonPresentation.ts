@@ -100,6 +100,8 @@ export const LESSON_PHASES: ReadonlyArray<{ id: LessonPhaseId; title: string }> 
   { id: "session_wrap_up", title: "Session wrap-up" },
 ];
 
+export const PREVIOUS_REVIEW_QUESTION_COUNT = 2;
+
 export function normalizePresentationText(value: unknown, fallback = "", maxLength = 1000): string {
   const normalized = String(value ?? "").trim();
   return (normalized || fallback).slice(0, maxLength);
@@ -127,6 +129,16 @@ export function normalizeLessonPhase(input: LessonPhaseInput): LessonPhase | nul
     total: LESSON_PHASES.length,
     title: LESSON_PHASES[index].title,
   };
+}
+
+export function shouldDeferCalibrationPhase(
+  phase: LessonPhase,
+  previousReviewActive: boolean,
+  previousReviewFeedbackCount: number,
+): boolean {
+  return phase.id === "calibration"
+    && previousReviewActive
+    && previousReviewFeedbackCount < PREVIOUS_REVIEW_QUESTION_COUNT;
 }
 
 export function normalizePresentationItems(value: unknown, maxItems = 6): string[] {

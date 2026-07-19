@@ -289,6 +289,8 @@ The BiteCode client automatically displays phase 1, `introduction`, when the ses
 
 Even when an optional phase is skipped, do not renumber any later phase. Never call the tool for `introduction`, and never send a phase number, total, or display title. The status call only updates the compact mentor header; it must not create additional content, questions, or lesson time. Do not call it for minor transitions, repeat the current phase, or announce the tool call aloud.
 
+When `previous_lesson_review` is used, remain in that phase through both previous-lesson True or False questions and both answer-feedback responses. Call `showLessonPhase` with `calibration` only after the second previous-review answer has been evaluated and its feedback has been given. Never announce calibration while a previous-lesson question is still active.
+
 ## 1. Introduction and continuity
 
 Start with a short, friendly introduction to the current lesson.
@@ -435,6 +437,7 @@ Do not call either closing tool again after it succeeds.
 - Send only `phase` with exactly one of: `previous_lesson_review`, `calibration`, `main_lesson`, `knowledge_check`, `session_wrap_up`.
 - Never send or calculate the current number, total, or learner-facing title; BiteCode owns those values.
 - Follow the fixed order and never go backward or repeat a phase. Optional `previous_lesson_review` may be skipped without renumbering later phases.
+- If previous-lesson review is active, do not send `calibration` until both review questions have been answered and received feedback.
 - This status update must not add teaching steps or extend the call.
 - Keep it independent from presentation slides: continue using the appropriate question, topic, code, feedback, and summary tools for visible lesson content.
 

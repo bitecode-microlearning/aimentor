@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeLessonPhase, normalizePresentationItems, normalizePresentationText, normalizeTrueFalseQuestion } from "./lessonPresentation";
+import { normalizeLessonPhase, normalizePresentationItems, normalizePresentationText, normalizeTrueFalseQuestion, shouldDeferCalibrationPhase } from "./lessonPresentation";
 
 describe("lesson presentation input normalization", () => {
   it("normalizes JSON and newline-delimited item lists", () => {
@@ -33,5 +33,19 @@ describe("normalizeLessonPhase", () => {
 
   it("rejects an unknown phase identifier", () => {
     expect(normalizeLessonPhase({ phase: "made_up_phase" })).toBeNull();
+  });
+});
+
+describe("shouldDeferCalibrationPhase", () => {
+  const calibration = normalizeLessonPhase({ phase: "calibration" })!;
+
+  it("defers calibration while the two-question previous review is incomplete", () => {
+    expect(shouldDeferCalibrationPhase(calibration, true, 0)).toBe(true);
+    expect(shouldDeferCalibrationPhase(calibration, true, 1)).toBe(true);
+  });
+
+  it("allows calibration after both review answers received feedback", () => {
+    expect(shouldDeferCalibrationPhase(calibration, true, 2)).toBe(false);
+    expect(shouldDeferCalibrationPhase(calibration, false, 0)).toBe(false);
   });
 });

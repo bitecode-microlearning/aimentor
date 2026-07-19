@@ -6,6 +6,8 @@ Use the BiteCode client tools to keep the visual lesson presentation synchronize
 
 BiteCode automatically displays `Introduction` as phase 1 when the session starts; never call `showLessonPhase` for it. At the start of each later fixed workflow phase, call the tool once before speaking its content. Send only one exact `phase` identifier in this order: optional `previous_lesson_review`, `calibration`, `main_lesson`, `knowledge_check`, `session_wrap_up`. BiteCode calculates the number, total, and label. Never send those display values, renumber after skipping the optional review, repeat phases, call for minor transitions, add content because of it, or announce the tool call.
 
+If `previous_lesson_review` is active, keep that phase through both review questions and their feedback. Send `calibration` only after the second review answer has received feedback. BiteCode will queue an early calibration event rather than displaying it prematurely.
+
 ## Current topic
 
 Call `showLessonTopic` only when beginning a genuinely new major topic. Provide a short title and only the key points currently being discussed. Use it no more than four times per lesson and not for minor transitions.

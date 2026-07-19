@@ -19,6 +19,8 @@ import {
   normalizeLessonPhase,
   normalizePresentationText,
   normalizeTrueFalseQuestion,
+  PREVIOUS_REVIEW_QUESTION_COUNT,
+  shouldDeferCalibrationPhase,
   type AnswerFeedbackSlideInput,
   type CodeSlideInput,
   type LessonPresentationSlide,
@@ -186,6 +188,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const previousSafeStateRef = useRef<MentorControlState>("muted_waiting");
   const userRequestedEndRef = useRef(false);
   const activeMentorSessionIdRef = useRef<string | null>(null);
+  const previousReviewActiveRef = useRef(false);
+  const previousReviewFeedbackCountRef = useRef(0);
+  const deferredLessonPhaseRef = useRef<LessonPhase | null>(null);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
@@ -193,6 +198,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     mentorSessionState !== "disconnected" &&
     mentorSessionState !== "error";
   const isLessonTimerActive = isSessionActive && hasElevenLabsSessionStarted;
+
+  const applyLessonPhase = (phase: LessonPhase | null) => {
+    setLessonPhase(phase);
+  };
 
   const finalizeLessonPresentation = () => {
     if (presentationFinalizedRef.current) return;
@@ -275,7 +284,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setLastMentorMessage("");
     lastMentorMessageRef.current = "";
     setConnectionStatusMessage("");
-    setLessonPhase(null);
+    applyLessonPhase(null);
+    previousReviewActiveRef.current = false;
+    previousReviewFeedbackCountRef.current = 0;
+    deferredLessonPhaseRef.current = null;
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
     clearProgressTimer();
@@ -501,7 +513,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
     setTokenSupportDebugMessage("");
-    setLessonPhase(INITIAL_LESSON_PHASE);
+    applyLessonPhase(INITIAL_LESSON_PHASE);
+    previousReviewActiveRef.current = false;
+    previousReviewFeedbackCountRef.current = 0;
+    deferredLessonPhaseRef.current = null;
     setControlState("connecting");
     setIsMicMuted(true);
     sessionStartedAtRef.current = null;
@@ -639,7 +654,21 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showLessonPhase: async (payload: LessonPhaseInput) => {
             const phase = normalizeLessonPhase(payload);
             if (!phase) throw new Error("Unknown lesson phase. Use one of the fixed BiteCode phase identifiers.");
-            setLessonPhase(phase);
+
+            if (phase.id === "previous_lesson_review") {
+              previousReviewActiveRef.current = true;
+              previousReviewFeedbackCountRef.current = 0;
+              deferredLessonPhaseRef.current = null;
+              applyLessonPhase(phase);
+              return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
+            }
+
+            if (shouldDeferCalibrationPhase(phase, previousReviewActiveRef.current, previousReviewFeedbackCountRef.current)) {
+              deferredLessonPhaseRef.current = phase;
+              return "Calibration phase received early and queued. Keep the previous lesson review active until both review answers have feedback.";
+            }
+
+            applyLessonPhase(phase);
             return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
           },
           showLessonTopic: async (payload: TopicSlideInput) => {
@@ -653,6 +682,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             const wentWell = normalizePresentationItems(payload?.wentWell, 4);
             const checkAgain = normalizePresentationItems(payload?.checkAgain, 4);
             if (!wentWell.length && !checkAgain.length) throw new Error("Lesson recap requires at least one supported point.");
+            const reviewPhase = normalizeLessonPhase({ phase: "previous_lesson_review" });
+            if (reviewPhase) applyLessonPhase(reviewPhase);
+            previousReviewActiveRef.current = true;
+            previousReviewFeedbackCountRef.current = 0;
+            deferredLessonPhaseRef.current = null;
             onLessonPresentationChange?.({ type: "review", title, wentWell, checkAgain });
             return "Displayed the short previous-lesson recap. Continue the planned lesson without adding a review loop.";
           },
@@ -689,6 +723,15 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               result,
               ...(message ? { message } : {}),
             });
+            if (previousReviewActiveRef.current) {
+              previousReviewFeedbackCountRef.current += 1;
+              if (previousReviewFeedbackCountRef.current >= PREVIOUS_REVIEW_QUESTION_COUNT) {
+                previousReviewActiveRef.current = false;
+                const deferredPhase = deferredLessonPhaseRef.current;
+                deferredLessonPhaseRef.current = null;
+                if (deferredPhase) applyLessonPhase(deferredPhase);
+              }
+            }
             return `Displayed ${result.replace("_", " ")} answer feedback. Continue the normal lesson flow without adding a retry loop solely because of this card.`;
           },
           showCodeExample: async (payload: CodeSlideInput) => {
