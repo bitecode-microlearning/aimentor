@@ -284,12 +284,21 @@ async function resolveMentorContext(lessonData, env) {
   const lessonid = Number(lessonData.lessonid);
   const context = await env.DB.prepare(
     `SELECT u.firstname AS userfirstname, s.knowledgelevel, s.knowledgedomain, s.userpreferences,
-            c.name AS coursename, l.lessonname, l.goal, l.contentdescription, l.codedescription,
-            l.concepts, l.avoid
+            s.streakcount, s.unopenedcount, p.learning_goal AS userlearninggoal,
+            c.name AS coursename, c.learninggoal AS coursegoal,
+            l.lessonname, l.goal, l.contentdescription, l.codedescription, l.concepts, l.avoid,
+            (SELECT COUNT(*) FROM lessons course_lessons WHERE course_lessons.courseid = c.id) AS totallessons,
+            (SELECT COUNT(*) FROM lessons positioned_lessons
+              WHERE positioned_lessons.courseid = c.id AND positioned_lessons.id <= l.id) AS currentlesson,
+            (SELECT COUNT(DISTINCT nh.lessonid) FROM notificationhistory nh
+              WHERE nh.userid = u.id AND nh.courseid = c.id AND nh.lessonid IS NOT NULL AND nh.isopened = 1) AS openedlessons,
+            (SELECT COUNT(DISTINCT nh.lessonid) FROM notificationhistory nh
+              WHERE nh.userid = u.id AND nh.courseid = c.id AND nh.lessonid IS NOT NULL AND nh.isactioned = 1) AS completedlessons
        FROM users u
        INNER JOIN subscriptions s ON s.userid = u.id
        INNER JOIN courses c ON c.id = s.courseid
        INNER JOIN lessons l ON l.courseid = c.id
+       LEFT JOIN profiles p ON p.user_id = u.id
       WHERE u.id = ?1 AND s.id = ?2 AND c.id = ?3 AND l.id = ?4
         AND u.status = 'active'
       LIMIT 1`
@@ -344,6 +353,18 @@ async function resolveMentorContext(lessonData, env) {
   }));
   const content = [context.goal, context.contentdescription, context.codedescription, context.concepts]
     .map((value) => bounded(value, 4000)).filter(Boolean).join("\n\n").slice(0, 8000);
+  const totalLessons = Math.max(0, Number(context.totallessons) || 0);
+  const completedLessons = Math.max(0, Number(context.completedlessons) || 0);
+  const courseProgress = {
+    currentLesson: Math.max(1, Number(context.currentlesson) || 1),
+    totalLessons,
+    openedLessons: Math.max(0, Number(context.openedlessons) || 0),
+    completedLessons,
+    unopenedLessons: Math.max(0, Number(context.unopenedcount) || 0),
+    streakCount: Math.max(0, Number(context.streakcount) || 0),
+    completionPercent: totalLessons ? Math.min(100, Math.round((completedLessons / totalLessons) * 100)) : 0,
+    currentTopic: bounded(context.lessonname, 200),
+  };
   return {
     userid, subscriptionid, courseid, lessonid,
     userfirstname: bounded(context.userfirstname || "Learner", 100),
@@ -352,6 +373,13 @@ async function resolveMentorContext(lessonData, env) {
     knowledgelevel: bounded(context.knowledgelevel, 100),
     knowledgedomain: bounded(context.knowledgedomain, 500),
     userpreferences: bounded(context.userpreferences, 1000),
+    userlearninggoal: bounded(context.userlearninggoal, 1000),
+    coursegoal: bounded(context.coursegoal, 2000),
+    courseprogress: JSON.stringify(courseProgress),
+    lessongoal: bounded(context.goal, 2000),
+    contentdescription: bounded(context.contentdescription, 4000),
+    codedescription: bounded(context.codedescription, 4000),
+    concepts: bounded(context.concepts, 4000),
     content,
     learningmemory: JSON.stringify(recentSessions),
     knowledgestrengths: JSON.stringify(uniqueSignals(history.results, "strengths_json")),

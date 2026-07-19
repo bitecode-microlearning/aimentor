@@ -2719,35 +2719,73 @@ html {
 }
 
 .lesson-understanding-track {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0;
   margin: 20px 0 0;
   padding: 0;
   list-style: none;
 }
 
+.lesson-understanding-track::before {
+  position: absolute;
+  top: 17px;
+  left: 16.66%;
+  right: 16.66%;
+  height: 4px;
+  content: "";
+  background: linear-gradient(90deg, #1376c8 0%, #00a976 50%, #fe9613 100%);
+  border-radius: 999px;
+  opacity: .32;
+}
+
 .lesson-understanding-track li {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 7px;
+  justify-content: flex-start;
+  gap: 7px;
+  padding: 0 4px;
+  flex-direction: column;
   color: #777;
-  background: #f3f3f3;
-  border: 1px solid #e4e0dc;
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
   font-size: .76rem;
   font-weight: 700;
   text-align: center;
 }
 
 .lesson-understanding-track li.is-active {
+  color: var(--understanding-accent);
+}
+
+.lesson-understanding-scale-point {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  color: #777;
+  background: #fff;
+  border: 3px solid #d8d8d8;
+  border-radius: 999px;
+}
+
+.lesson-understanding-track li.is-active .lesson-understanding-scale-point {
   color: #fff;
   background: var(--understanding-accent);
   border-color: var(--understanding-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--understanding-accent) 16%, transparent);
 }
+
+.lesson-content-formatted { color: #3e4650; font-size: 1rem; line-height: 1.7; }
+.lesson-content-formatted p { margin: 0 0 12px; }
+.lesson-content-formatted p:last-child { margin-bottom: 0; }
+.lesson-content-formatted ul { display: grid; gap: 8px; margin: 0; padding-left: 22px; }
+.lesson-content-formatted li::marker { color: #00a976; }
+.lesson-content-code { margin: 0; padding: 16px; overflow-x: auto; color: #e8edf2; background: #1e1e1e; border-radius: 10px; font-family: "Cascadia Code", Consolas, monospace; font-size: .88rem; line-height: 1.6; white-space: pre-wrap; }
 
 .lesson-understanding-actions {
   display: flex;

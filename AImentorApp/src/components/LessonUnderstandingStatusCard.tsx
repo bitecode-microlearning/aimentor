@@ -49,17 +49,17 @@ export function LessonUnderstandingStatusCard({
   return (
     <section
       className={`lesson-understanding-card lesson-understanding-${status}${compact ? " is-compact" : ""}`}
-      aria-labelledby={`lesson-understanding-${context}-title`}
+      aria-labelledby={isPrevious ? `lesson-understanding-${context}-title` : `lesson-understanding-${context}-result`}
       aria-describedby={`lesson-understanding-${context}-description`}
       data-status={status}
     >
       <div className="lesson-understanding-copy">
         <p className="lesson-understanding-eyebrow">{isPrevious ? "Previous lesson" : "Lesson outcome"}</p>
-        <h2 id={`lesson-understanding-${context}-title`}>{lessonName}</h2>
+        {isPrevious && <h2 id={`lesson-understanding-${context}-title`}>{lessonName}</h2>}
         <div className="lesson-understanding-result" role="status" aria-live={isPrevious ? "off" : "polite"}>
           <span className="lesson-understanding-icon" aria-hidden="true"><StatusIcon size={compact ? 22 : 28} /></span>
           <div>
-            <strong>{details.label}</strong>
+            <strong id={`lesson-understanding-${context}-result`}>{details.label}</strong>
             <p id={`lesson-understanding-${context}-description`}>
               {isPrevious ? details.previousDescription : details.description}
             </p>
@@ -72,7 +72,7 @@ export function LessonUnderstandingStatusCard({
           const StepIcon = statusDetails[step].icon;
           return (
             <li key={step} className={step === status ? "is-active" : ""} aria-current={step === status ? "step" : undefined}>
-              <span aria-hidden="true"><StepIcon size={16} /></span>
+              <span className="lesson-understanding-scale-point" aria-hidden="true"><StepIcon size={15} /></span>
               <span>{statusDetails[step].label}</span>
             </li>
           );

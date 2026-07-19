@@ -8,6 +8,18 @@ import { Footer } from "./components/Footer";
 import { parseLessonEvaluation, type LessonEvaluation } from "./domain/lessonUnderstanding";
 import type { LessonPresentationSlide } from "./domain/lessonPresentation";
 
+function formatConcepts(value: unknown): string {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed.map((item) => `- ${String(item)}`).join("\n");
+  } catch {
+    // The database also contains ordinary prose and newline-separated concept lists.
+  }
+  return text;
+}
+
 function App() {
   // 🔹 State for lesson data
   const [lessonData, setLessonData] = useState<{
@@ -21,6 +33,9 @@ function App() {
     knowledgestrengths?: string;
     knowledgegaps?: string;
     practicerecommendations?: string;
+    userlearninggoal?: string;
+    coursegoal?: string;
+    courseprogress?: string;
     mentorSessionId?: string;
     userId?: string;
     subscriptionId?: string;
@@ -101,6 +116,9 @@ function App() {
           knowledgestrengths: json.knowledgestrengths || "[]",
           knowledgegaps: json.knowledgegaps || "[]",
           practicerecommendations: json.practicerecommendations || "[]",
+          userlearninggoal: json.userlearninggoal || "",
+          coursegoal: json.coursegoal || "",
+          courseprogress: json.courseprogress || "{}",
           mentorSessionId: json.mentor_session_id || json.mentorSessionId,
           userId: String(json.userid || json.user_id || json.userId || ""),
           subscriptionId: String(json.subscriptionid || json.subscription_id || json.subscriptionId || ""),
@@ -112,13 +130,20 @@ function App() {
           previousLessonEvaluation: parseLessonEvaluation(json.previouslessonevaluation) ?? undefined,
 
           sections: [
-            {
-              title: "Lesson",
-              content: String(json.content || "<p>No content available.</p>"),
-              type: "text" as const,
-            },
-          ],
+            json.lessongoal && { title: "Lesson goal", content: String(json.lessongoal), type: "tip" as const },
+            json.contentdescription && { title: "Topic overview", content: String(json.contentdescription), type: "text" as const },
+            json.concepts && { title: "Key concepts", content: formatConcepts(json.concepts), type: "text" as const },
+            json.codedescription && { title: "Code focus", content: String(json.codedescription), type: "text" as const },
+          ].filter(Boolean) as Array<{ title: string; content: string; type: "text" | "code" | "tip" }>,
         };
+
+        if (!mapped.sections.length) {
+          mapped.sections = [{
+            title: "Lesson overview",
+            content: String(json.content || "No lesson overview is available yet."),
+            type: "text",
+          }];
+        }
 
         setLessonData(mapped);
       } catch (e) {
@@ -162,6 +187,9 @@ function App() {
                   knowledgestrengths={lessonData.knowledgestrengths}
                   knowledgegaps={lessonData.knowledgegaps}
                   practicerecommendations={lessonData.practicerecommendations}
+                  userlearninggoal={lessonData.userlearninggoal}
+                  coursegoal={lessonData.coursegoal}
+                  courseprogress={lessonData.courseprogress}
                   mentorSessionId={lessonData.mentorSessionId}
                   userId={lessonData.userId}
                   subscriptionId={lessonData.subscriptionId}

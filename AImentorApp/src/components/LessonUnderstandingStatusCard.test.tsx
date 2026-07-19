@@ -18,6 +18,7 @@ describe("LessonUnderstandingStatusCard", () => {
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     expect(container.querySelector('[aria-current="step"]')?.textContent).toContain(label);
     expect(container.querySelector("section")?.getAttribute("data-status")).toBe(status);
+    expect(screen.queryByText("Inputs and outputs")).toBeNull();
   });
 
   it("renders compact previous lesson context", () => {

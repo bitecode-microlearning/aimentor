@@ -168,7 +168,7 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
   return (
     <section className="lesson-stage lesson-stage-summary" aria-live="polite">
       <div className="lesson-stage-heading"><Sparkles size={28} aria-hidden="true" /><p>Session complete</p></div>
-      <h3>{slide.title || lessonName}</h3>
+      <h3>{slide.title && slide.title !== lessonName ? slide.title : "Your lesson result"}</h3>
       {renderEvaluation("current")}
       <SlideList items={slide.coveredTopics} />
       {slide.takeaway && <p className="lesson-stage-takeaway"><strong>Key takeaway:</strong> {slide.takeaway}</p>}

@@ -44,6 +44,9 @@ interface MentorPanelProps {
   knowledgestrengths?: string;
   knowledgegaps?: string;
   practicerecommendations?: string;
+  userlearninggoal?: string;
+  coursegoal?: string;
+  courseprogress?: string;
   mentorSessionId?: string;
   userId?: string;
   subscriptionId?: string;
@@ -148,6 +151,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   knowledgestrengths,
   knowledgegaps,
   practicerecommendations,
+  userlearninggoal,
+  coursegoal,
+  courseprogress,
   mentorSessionId,
   userId,
   subscriptionId,
@@ -624,6 +630,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             knowledgestrengths: knowledgestrengths || "[]",
             knowledgegaps: knowledgegaps || "[]",
             practicerecommendations: practicerecommendations || "[]",
+            userlearninggoal: userlearninggoal || "",
+            coursegoal: coursegoal || "",
+            courseprogress: courseprogress || "{}",
             previous_lesson_evaluation: JSON.stringify(previousLessonEvaluation ?? null),
           }
         : {

@@ -7,6 +7,39 @@ import type { LessonEvaluation } from '../domain/lessonUnderstanding';
 import type { LessonPresentationSlide } from '../domain/lessonPresentation';
 import { LessonPresentationStage } from './LessonPresentationStage';
 
+function plainLessonText(value: string): string {
+  return value
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\s*\/\s*p\s*>/gi, '\n\n')
+    .replace(/<\s*li[^>]*>/gi, '- ')
+    .replace(/<\s*\/\s*li\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim();
+}
+
+function FormattedLessonText({ content, type }: { content: string; type?: LessonSection['type'] }) {
+  const text = plainLessonText(content);
+  if (type === 'code') return <pre className="lesson-content-code"><code>{text}</code></pre>;
+
+  const blocks = text.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  return (
+    <div className="lesson-content-formatted">
+      {blocks.map((block, index) => {
+        const lines = block.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const listItems = lines.filter((line) => /^[-*•]\s+/.test(line));
+        if (listItems.length === lines.length && listItems.length > 0) {
+          return <ul key={index}>{listItems.map((line, itemIndex) => <li key={itemIndex}>{line.replace(/^[-*•]\s+/, '')}</li>)}</ul>;
+        }
+        return <p key={index}>{lines.join(' ')}</p>;
+      })}
+    </div>
+  );
+}
+
 interface LessonSection {
   title: string;
   content: string;
@@ -53,10 +86,7 @@ export function LessonContent({ lessonName, sections, lessonEvaluation, presenta
               {!section.type && <CheckCircle2 className="text-[#1376C8] flex-shrink-0 mt-1" size={24} />}
               <div className="flex-1">
                 <h3 className="mt-0 mb-3">{section.title}</h3>
-                <div 
-                  className={`${section.type === 'code' ? 'bg-gray-100 p-4 rounded-lg font-mono text-sm overflow-x-auto' : ''}`}
-                  dangerouslySetInnerHTML={{ __html: section.content }}
-                />
+                <FormattedLessonText content={section.content} type={section.type} />
               </div>
             </div>
           </Card>
