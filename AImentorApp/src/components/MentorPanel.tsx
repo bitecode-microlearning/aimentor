@@ -464,7 +464,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setSessionElapsedSeconds(0);
     setHasElevenLabsSessionStarted(false);
     setConnectionStatusMessage("Loading mentor configuration...");
-    setVisibleEvaluation(null);
 
     try {
       let WORKER_AGENT_URL: string | undefined;
