@@ -110,6 +110,9 @@ const formatElapsedTime = (elapsedSeconds: number) => {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
+const isOpeningReadinessQuestion = (message: string) =>
+  /\b(?:are you ready|ready to (?:begin|start|continue)|shall we (?:begin|start))\b/i.test(message);
+
 const getDisconnectMessage = (details: DisconnectionDetails): string | null => {
   if (details.reason === "user") return null;
   if (details.reason === "agent") {
@@ -380,7 +383,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (nextMode === "listening") {
       if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
 
-      if (!learnerAnswerExpectedRef.current) {
+      const openingReadinessExpected = isOpeningReadinessQuestion(lastMentorMessageRef.current);
+      if (!learnerAnswerExpectedRef.current && !openingReadinessExpected) {
         setMicrophoneMuted(true);
         setControlState("mentor_speaking");
         if (!automaticContinuationInFlightRef.current) {
