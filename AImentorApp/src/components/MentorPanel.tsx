@@ -628,7 +628,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   return (
-    <div className="relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
+    <div className="mentor-panel-shell relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
         <video
           key={mentorVideoSrc}

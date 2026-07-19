@@ -17,7 +17,7 @@ interface LessonContentProps {
 
 export function LessonContent({ lessonName, sections }: LessonContentProps) {
   return (
-    <div className="space-y-6">
+    <div className="lesson-content-panel space-y-6">
       {/* Lesson Header */}
       <div className="border-b-4 border-[#1376C8] pb-4">
         <div className="flex items-center gap-3 mb-2">

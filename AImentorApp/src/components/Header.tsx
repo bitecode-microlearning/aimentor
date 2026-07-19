@@ -1,8 +1,8 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { BookOpen, Heart, Home, Menu, MessageSquare, ShieldCheck, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
-import bitecodeLogo from "./img/bitcode_logo_mini_clear.png";
+import bitecodeLogo from "./img/bitecode-logo.webp";
 
 interface HeaderProps {
   courseName: string;
@@ -40,7 +40,6 @@ export function Header({ courseName }: HeaderProps) {
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
       >
-        <Home size={18} />
         <span>Home</span>
       </a>
       <a
@@ -50,7 +49,6 @@ export function Header({ courseName }: HeaderProps) {
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
       >
-        <BookOpen size={18} />
         <span>Courses</span>
       </a>
       <a
@@ -60,8 +58,7 @@ export function Header({ courseName }: HeaderProps) {
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
       >
-        <MessageSquare size={18} />
-        <span>Feedback</span>
+        <span>Contact</span>
       </a>
       <a
         href="https://www.bitecode.co/home/legal-terms-privacy"
@@ -70,8 +67,7 @@ export function Header({ courseName }: HeaderProps) {
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
       >
-        <ShieldCheck size={18} />
-        <span>Legal Terms & Privacy</span>
+        <span>Legal &amp; Privacy</span>
       </a>
       <a
         href="https://buymeacoffee.com/bitecode"
@@ -80,8 +76,7 @@ export function Header({ courseName }: HeaderProps) {
         rel="noopener noreferrer"
         onClick={() => setIsOpen(false)}
       >
-        <Heart size={18} />
-        <span>Give back to learn more!</span>
+        <span>Donate</span>
       </a>
     </>
   );
@@ -91,12 +86,13 @@ export function Header({ courseName }: HeaderProps) {
       <div className="app-header-inner">
         <div className="header-desktop">
           <div className="header-brand">
-            <div className="header-logo header-logo-desktop">
-              <img src={bitecodeLogo} alt="BiteCode" />
+            <div className="header-logo header-logo-desktop" aria-label="BiteCode">
+              <img src={bitecodeLogo} alt="" />
+              <span>BiteCode</span>
             </div>
             <div>
-              <h1 className="header-title">BiteCode - {courseName}</h1>
-              <h2 className="header-subtitle">AI Mentoring Lesson</h2>
+              <h1 className="header-title">{courseName}</h1>
+              <h2 className="header-subtitle">AI Mentor lesson</h2>
             </div>
           </div>
 
@@ -107,15 +103,16 @@ export function Header({ courseName }: HeaderProps) {
 
         <div className="header-mobile">
           <div className="header-brand header-brand-mobile">
-            <div className="header-logo header-logo-mobile">
-              <img src={bitecodeLogo} alt="BiteCode" />
+            <div className="header-logo header-logo-mobile" aria-label="BiteCode">
+              <img src={bitecodeLogo} alt="" />
+              <span>BiteCode</span>
             </div>
             <div>
               <h1 className="header-title header-title-mobile">
-                BiteCode - {courseName}
+                {courseName}
               </h1>
               <h2 className="header-subtitle header-subtitle-mobile">
-                AI Mentoring Lesson
+                AI Mentor lesson
               </h2>
             </div>
           </div>
@@ -149,8 +146,8 @@ export function Header({ courseName }: HeaderProps) {
             aria-label="Navigation menu"
           >
             <div className="mobile-menu-header">
-              <div className="header-logo header-logo-mobile">
-                <img src={bitecodeLogo} alt="BiteCode" />
+              <div className="header-logo header-logo-mobile" aria-label="BiteCode">
+                <img src={bitecodeLogo} alt="" />
               </div>
               <div className="mobile-menu-title">
                 <div>BiteCode</div>

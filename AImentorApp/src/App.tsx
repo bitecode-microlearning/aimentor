@@ -131,12 +131,12 @@ function App() {
         </div>
       </div>
     ) : (
-      <div className="min-h-screen bg-[#F6F6F6] flex flex-col">
+      <div className="mentor-app min-h-screen bg-[#F6F6F6] flex flex-col">
         {/* Header */}
         <Header courseName={lessonData.courseName} />
 
         {/* Main content */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 py-8">
+        <main className="mentor-app-main flex-1 w-full max-w-7xl mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
             {/* Left side - Mentor Panel */}
             <div className="lg:col-span-2 order-1">
@@ -166,7 +166,7 @@ function App() {
 
             {/* Right side - Lesson Content */}
             <div className="lg:col-span-3 order-2">
-              <div className="bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-0 md:p-8">
+              <div className="lesson-shell bg-white rounded-3xl shadow-lg border border-[#E0E0E0] p-0 md:p-8">
                 <LessonContent
                   lessonName={lessonData.lessonName}
                   sections={lessonData.sections}

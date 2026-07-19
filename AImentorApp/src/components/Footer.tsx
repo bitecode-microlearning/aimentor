@@ -1,33 +1,25 @@
 import React from 'react';
-import { Heart, Code, Zap } from 'lucide-react';
 import { APP_VERSION } from '../config/appVersion';
+import bitecodeLogo from './img/bitecode-logo.webp';
 
 export function Footer() {
   return (
-    <footer className="w-full bg-white text-[#666] border-t border-[#E0E0E0] py-6 mt-auto">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col items-center gap-1 md:items-start">
-            <span>&copy; 2025 BiteCode Academy. All rights reserved.</span>
-            <span className="text-xs text-[#999]">AI Mentor App {APP_VERSION}</span>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 text-sm">
-              <Code size={16} className="text-[#1376C8]" />
-              <span>Learn.</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Zap size={16} className="text-[#00CE8D]" />
-              <span>Practice.</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Heart size={16} className="text-[#1376C8]" />
-              <span>Repeat.</span>
-            </div>
-          </div>
+    <footer className="mentor-footer">
+      <div className="mentor-footer-brand">
+        <div className="mentor-footer-logo">
+          <img src={bitecodeLogo} alt="" />
+          <strong>BiteCode</strong>
         </div>
+        <p>Build the knowledge and habits behind better software.</p>
+        <span>AI Mentor App {APP_VERSION}</span>
       </div>
+      <nav className="mentor-footer-links" aria-label="Footer navigation">
+        <a href="https://www.bitecode.co/">Home</a>
+        <a href="https://www.bitecode.co/courses">Learning paths</a>
+        <a href="https://www.bitecode.co/home/feedback">Contact</a>
+        <a href="https://www.bitecode.co/home/legal-terms-privacy">Legal &amp; Privacy</a>
+        <a href="https://buymeacoffee.com/bitecode" target="_blank" rel="noreferrer">Donate</a>
+      </nav>
     </footer>
   );
 }
