@@ -42,6 +42,10 @@ function App() {
     ],
   });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [visibleLessonEvaluation, setVisibleLessonEvaluation] = useState<{
+    evaluation: LessonEvaluation;
+    context: "previous" | "current";
+  } | null>(null);
 
   // 🔹 Load lesson data from Worker when app starts
   useEffect(() => {
@@ -164,6 +168,9 @@ function App() {
                   signedData={lessonData.signedData}
                   signedSig={lessonData.signedSig}
                   previousLessonEvaluation={lessonData.previousLessonEvaluation}
+                  onLessonEvaluationVisible={(evaluation, context) => {
+                    setVisibleLessonEvaluation({ evaluation, context });
+                  }}
                 />
               </div>
             </div>
@@ -174,6 +181,7 @@ function App() {
                 <LessonContent
                   lessonName={lessonData.lessonName}
                   sections={lessonData.sections}
+                  lessonEvaluation={visibleLessonEvaluation}
                 />
               </div>
             </div>

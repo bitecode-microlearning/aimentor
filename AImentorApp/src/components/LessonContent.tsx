@@ -3,6 +3,8 @@ import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { CheckCircle2, BookOpen, Code, Lightbulb } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { LessonUnderstandingStatusCard } from './LessonUnderstandingStatusCard';
+import type { LessonEvaluation } from '../domain/lessonUnderstanding';
 
 interface LessonSection {
   title: string;
@@ -13,9 +15,13 @@ interface LessonSection {
 interface LessonContentProps {
   lessonName: string;
   sections: LessonSection[];
+  lessonEvaluation?: {
+    evaluation: LessonEvaluation;
+    context: 'previous' | 'current';
+  } | null;
 }
 
-export function LessonContent({ lessonName, sections }: LessonContentProps) {
+export function LessonContent({ lessonName, sections, lessonEvaluation }: LessonContentProps) {
   return (
     <div className="lesson-content-panel space-y-6">
       {/* Lesson Header */}
@@ -36,6 +42,15 @@ export function LessonContent({ lessonName, sections }: LessonContentProps) {
           Click the chat button to start a conversation and ask questions at any time.
         </p>
       </Card>
+
+      {lessonEvaluation && (
+        <LessonUnderstandingStatusCard
+          lessonName={lessonEvaluation.evaluation.lessonName}
+          status={lessonEvaluation.evaluation.status}
+          context={lessonEvaluation.context}
+          compact={lessonEvaluation.context === 'previous'}
+        />
+      )}
 
       {/* Lesson Sections */}
       <div className="space-y-4">

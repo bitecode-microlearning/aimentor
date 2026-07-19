@@ -16,19 +16,19 @@ const statusDetails = {
   mastered: {
     label: "Mastered",
     description: "You showed a strong understanding of this topic.",
-    previousDescription: "You showed a strong understanding. Let’s reinforce it briefly before moving forward.",
+    previousDescription: "You showed a strong understanding of this topic in the previous session.",
     icon: Award,
   },
   understood: {
     label: "Understood",
     description: "You understood the key ideas of this lesson.",
-    previousDescription: "You understood the key ideas. Let’s quickly reinforce them before moving forward.",
+    previousDescription: "You understood the key ideas of this topic in the previous session.",
     icon: Check,
   },
   needs_review: {
     label: "Needs Review",
     description: "A short review will help strengthen this topic.",
-    previousDescription: "A short review will help strengthen this topic before moving forward.",
+    previousDescription: "This topic was marked for additional practice after the previous session.",
     icon: RefreshCw,
   },
 } as const;
