@@ -135,7 +135,7 @@ async function playAnswerFeedbackSound(result: AnswerFeedbackResult) {
     oscillator.type = result === "wrong" ? "triangle" : "sine";
     oscillator.frequency.setValueAtTime(tone.frequency, start);
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(result === "correct" ? 0.055 : 0.04, start + 0.025);
+    gain.gain.exponentialRampToValueAtTime(result === "correct" ? 0.0605 : 0.044, start + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, end);
     oscillator.connect(gain);
     gain.connect(audioContext.destination);
@@ -219,6 +219,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const pendingCurrentEvaluationRef = useRef<LessonEvaluation | null>(null);
   const pendingSummarySlideRef = useRef<Extract<LessonPresentationSlide, { type: "summary" }> | null>(null);
   const presentationFinalizedRef = useRef(false);
+  const closingSummaryCompletedRef = useRef(false);
+  const closingEvaluationCompletedRef = useRef(false);
+  const closingFarewellDetectedRef = useRef(false);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
   const usageRegistrationTimerRef = useRef<number | null>(null);
@@ -397,6 +400,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       setLastMentorMessage(text);
       debugMentorControls("mentor message", text);
 
+      if (
+        closingSummaryCompletedRef.current &&
+        closingEvaluationCompletedRef.current &&
+        /\b(?:goodbye|good-bye|see you|talk to you soon|until next time|take care)\b/i.test(text)
+      ) {
+        closingFarewellDetectedRef.current = true;
+      }
+
       if (stateRef.current === "mentor_waiting_for_answer" || stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") {
         switchToMentorSpeaking();
       }
@@ -414,6 +425,22 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
 
     if (nextMode === "listening") {
+      if (closingFarewellDetectedRef.current) {
+        closingFarewellDetectedRef.current = false;
+        userRequestedEndRef.current = true;
+        setMicrophoneMuted(true);
+        const ending = conversationRef.current?.endSession?.();
+        if (ending && typeof (ending as Promise<void>).catch === "function") {
+          (ending as Promise<void>).catch((error) => {
+            userRequestedEndRef.current = false;
+            debugMentorControls("automatic closing failed", error);
+            setErrorMessage("The lesson finished, but the connection could not close automatically.");
+            setControlState("error");
+          });
+        }
+        return;
+      }
+
       if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
 
       const openingReadinessExpected = isOpeningReadinessQuestion(lastMentorMessageRef.current);
@@ -575,6 +602,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     pendingCurrentEvaluationRef.current = null;
     pendingSummarySlideRef.current = null;
+    closingSummaryCompletedRef.current = false;
+    closingEvaluationCompletedRef.current = false;
+    closingFarewellDetectedRef.current = false;
     learnerAnswerExpectedRef.current = false;
     automaticContinuationInFlightRef.current = false;
     presentationFinalizedRef.current = false;
@@ -843,6 +873,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               ...(takeaway ? { takeaway } : {}),
               encouragement,
             };
+            closingSummaryCompletedRef.current = true;
             return "Prepared the closing lesson summary. It will be displayed after the call ends.";
           },
           showPreviousLessonEvaluation: async () => {
@@ -873,6 +904,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             } catch (error) {
               debugMentorControls("lesson evaluation persistence failed", getReadableError(error));
             }
+            closingEvaluationCompletedRef.current = true;
             return `Processed the lesson outcome: ${evaluation.status}. Do not add another teaching or reinforcement loop. Finish the normal spoken wrap-up and end the session; the result will appear after the call ends.`;
           },
         },
