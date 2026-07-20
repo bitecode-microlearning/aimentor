@@ -46,6 +46,27 @@ describe("LessonPresentationStage", () => {
     expect(screen.getByText("Hidden side effects")).toBeTruthy();
   });
 
+  it("shows coaching topics with the learner's own inputs", () => {
+    render(<LessonPresentationStage lessonName="State" slide={{
+      type: "coaching_discussion",
+      title: "Your goals and learning preferences",
+      points: [{ topic: "Course goal", learnerInput: "I want to build reliable APIs." }],
+    }} />);
+    expect(screen.getByText("Goals and priorities")).toBeTruthy();
+    expect(screen.getByText("Course goal")).toBeTruthy();
+    expect(screen.getByText(/I want to build reliable APIs/)).toBeTruthy();
+  });
+
+  it("shows the three-point coaching recap", () => {
+    render(<LessonPresentationStage lessonName="State" slide={{
+      type: "coaching_recap",
+      title: "What we discussed",
+      points: ["Build confidence", "Use shorter examples", "Practise APIs"],
+    }} />);
+    expect(screen.getByText("What we discussed")).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+  });
+
   it("uses the fixed BiteCode support URL", () => {
     render(<LessonPresentationStage lessonName="State" slide={{ type: "donation" }} />);
     expect(screen.getByRole("link", { name: /Buy me a coffee/ }).getAttribute("href")).toBe("https://buymeacoffee.com/bitecode");

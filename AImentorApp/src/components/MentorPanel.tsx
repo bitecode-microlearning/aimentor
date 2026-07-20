@@ -3,9 +3,15 @@ import { Conversation, type DisconnectionDetails } from "@elevenlabs/client";
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
+  advanceVoiceActivitySamples,
   debugMentorControls,
   getHearingCheckRequest,
   getReadableError,
+  isClosingFarewellMessage,
+  isCurrentSessionGeneration,
+  isMentorQuestionLeadIn,
+  isRecoverableClientToolError,
+  shouldAutoContinueMentorTurn,
   type MentorControlState,
 } from "./mentorControls";
 import { Clock, Coffee, MessageSquare, Volume2 } from "lucide-react";
@@ -16,7 +22,11 @@ import {
   type LessonEvaluationInput,
 } from "../domain/lessonUnderstanding";
 import {
+  createInitialCoachingDiscussionSlide,
+  createMainLessonTopicSlide,
+  normalizeCoachingDiscussionPoints,
   normalizePresentationItems,
+  initialLessonPhase,
   normalizeLessonPhase,
   normalizePresentationText,
   normalizeTrueFalseQuestion,
@@ -24,6 +34,8 @@ import {
   shouldDeferCalibrationPhase,
   type AnswerFeedbackSlideInput,
   type CodeSlideInput,
+  type CoachingDiscussionSlideInput,
+  type CoachingRecapSlideInput,
   type LessonPresentationSlide,
   type LessonPhase,
   type LessonPhaseInput,
@@ -33,6 +45,7 @@ import {
   type TopicSlideInput,
 } from "../domain/lessonPresentation";
 import { formatSessionTopicHeader } from "./sessionTopicHeader";
+import { MentorDebugPanel, type MentorDebugEvent } from "./MentorDebugPanel";
 
 interface MentorPanelProps {
   userfirstname?: string;
@@ -66,13 +79,6 @@ interface MentorPanelProps {
   onLessonPresentationChange?: (slide: LessonPresentationSlide | null) => void;
 }
 
-const INITIAL_LESSON_PHASE: LessonPhase = {
-  id: "introduction",
-  current: 1,
-  total: 6,
-  title: "Introduction",
-};
-
 type ConversationInstance = {
   endSession?: () => Promise<void> | void;
   setMicMuted?: (muted: boolean) => Promise<void> | void;
@@ -92,15 +98,13 @@ type TokenAvailabilityDebug = {
 const ESTIMATED_SESSION_SECONDS = 480;
 const USAGE_REGISTRATION_DELAY_MS = 60 * 1000;
 const USAGE_REGISTRATION_RETRY_DELAYS_MS = [10 * 1000, 30 * 1000, 60 * 1000];
-const INITIAL_LEARNER_RESPONSE_WAIT_MS = 6000;
+const INITIAL_LEARNER_RESPONSE_WAIT_MS = 15_000;
 const HEARING_CHECK_RESPONSE_WAIT_MS = 4000;
-const HEARING_CHECK_FALLBACK_WAIT_MS = 2500;
+const LEARNER_VOICE_ACTIVITY_THRESHOLD = 0.35;
+const LEARNER_VOICE_ACTIVITY_SAMPLES = 2;
+const STARTUP_CONTINUATION_REQUEST = "Hello.";
+const TURN_CONTINUATION_REQUEST = "Please continue.";
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
-const FEMALE_ENGLISH_VOICE_NAMES = [
-  "female", "zira", "aria", "jenny", "samantha", "victoria", "karen", "moira",
-  "tessa", "ava", "susan", "hazel", "heera", "sonia", "libby", "natasha", "ana",
-  "google us english", "google uk english female",
-];
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
@@ -109,15 +113,39 @@ const mentorVideos = Object.entries(
 
 const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
 
-const pickFemaleEnglishSpeechVoice = (voices: SpeechSynthesisVoice[]) => {
-  const englishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
-  return englishVoices.find((voice) => {
-    const normalizedName = voice.name.toLowerCase();
-    return FEMALE_ENGLISH_VOICE_NAMES.some((candidate) =>
-      new RegExp(`(^|[^a-z])${candidate.replace(/ /g, "[ -]")}([^a-z]|$)`).test(normalizedName),
-    );
-  });
+const MAX_DEBUG_EVENTS = 250;
+
+const redactDebugValue = (value: unknown): unknown => {
+  if (value instanceof Error) return { name: value.name, message: value.message };
+  if (Array.isArray(value)) return value.map(redactDebugValue);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+    const normalizedKey = key.toLowerCase();
+    if (normalizedKey.includes("signed_url") || normalizedKey === "signedurl" || normalizedKey === "sig" || normalizedKey === "signature") {
+      return [key, "[redacted]"];
+    }
+    return [key, redactDebugValue(item)];
+  }));
 };
+
+const instrumentClientTools = <T extends Record<string, (...args: any[]) => any>>(
+  tools: T,
+  log: (category: string, label: string, data?: unknown) => void,
+): T => Object.fromEntries(Object.entries(tools).map(([name, handler]) => [
+  name,
+  async (...args: any[]) => {
+    log("tool", `${name} called`, args[0]);
+    try {
+      const result = await handler(...args);
+      log("tool", `${name} completed`, result);
+      return result;
+    } catch (error) {
+      log("error", `${name} failed`, error);
+      throw error;
+    }
+  },
+])) as T;
 
 const formatTokenCount = (value: unknown) => {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -241,6 +269,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
   const [lessonPhase, setLessonPhase] = useState<LessonPhase | null>(null);
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
+  const [debugMode, setDebugMode] = useState(false);
+  const [debugEvents, setDebugEvents] = useState<MentorDebugEvent[]>([]);
+  const debugModeRef = useRef(false);
+  const debugEventIdRef = useRef(0);
   const [mentorVideo] = useState(pickRandomMentorVideo);
   const conversationRef = useRef<ConversationInstance | null>(null);
   const pendingCurrentEvaluationRef = useRef<LessonEvaluation | null>(null);
@@ -261,15 +293,23 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const userRequestedEndRef = useRef(false);
   const activeMentorSessionIdRef = useRef<string | null>(null);
   const previousReviewActiveRef = useRef(false);
+  const relationshipPhaseAcknowledgedRef = useRef(false);
   const previousReviewFeedbackCountRef = useRef(0);
   const deferredLessonPhaseRef = useRef<LessonPhase | null>(null);
   const pendingKnowledgeCheckPhaseRef = useRef<LessonPhase | null>(null);
   const lastDisplayedTopicTitleRef = useRef("");
   const learnerAnswerExpectedRef = useRef(false);
+  const questionToolPendingRef = useRef(false);
   const learnerResponseTimerRef = useRef<number | null>(null);
   const hearingCheckIssuedRef = useRef(false);
   const hearingCheckSpokenRef = useRef(false);
-  const hearingCheckUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const learnerVoiceActivitySamplesRef = useRef(0);
+  const learnerVoiceDetectedRef = useRef(false);
+  const initialGreetingReceivedRef = useRef(false);
+  const startupContinuationSentRef = useRef(false);
+  const startupContinuationPendingRef = useRef(false);
+  const lastAutoContinuedMentorMessageRef = useRef("");
+  const sessionGenerationRef = useRef(0);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
@@ -277,6 +317,18 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     mentorSessionState !== "disconnected" &&
     mentorSessionState !== "error";
   const isLessonTimerActive = isSessionActive && hasElevenLabsSessionStarted;
+
+  const appendDebugEvent = (category: string, label: string, data?: unknown) => {
+    if (!debugModeRef.current) return;
+    const nextEvent: MentorDebugEvent = {
+      id: ++debugEventIdRef.current,
+      timestamp: new Date().toLocaleTimeString("en-GB", { hour12: false }),
+      category,
+      label,
+      ...(data === undefined ? {} : { data: redactDebugValue(data) }),
+    };
+    setDebugEvents((current) => [...current.slice(-(MAX_DEBUG_EVENTS - 1)), nextEvent]);
+  };
 
   const applyLessonPhase = (phase: LessonPhase | null) => {
     setLessonPhase(phase);
@@ -300,6 +352,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
   const setControlState = (nextState: MentorControlState) => {
     debugMentorControls("state change", { from: stateRef.current, to: nextState });
+    appendDebugEvent("state", "control state changed", { from: stateRef.current, to: nextState });
     stateRef.current = nextState;
     setMentorSessionState(nextState);
   };
@@ -336,15 +389,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     clearLearnerResponseTimer();
     hearingCheckIssuedRef.current = false;
     hearingCheckSpokenRef.current = false;
-    if (hearingCheckUtteranceRef.current && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      hearingCheckUtteranceRef.current = null;
-    }
+    learnerVoiceActivitySamplesRef.current = 0;
+    learnerVoiceDetectedRef.current = false;
   };
 
   const setMicrophoneMuted = (muted: boolean) => {
     clearPendingUnmute();
     setIsMicMuted(muted);
+    appendDebugEvent("audio", muted ? "microphone muted" : "microphone unmuted");
 
     try {
       const muteResult = conversationRef.current?.setMicMuted?.(muted);
@@ -387,6 +439,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     pendingKnowledgeCheckPhaseRef.current = null;
     lastDisplayedTopicTitleRef.current = "";
     learnerAnswerExpectedRef.current = false;
+    questionToolPendingRef.current = false;
+    initialGreetingReceivedRef.current = false;
+    startupContinuationSentRef.current = false;
+    startupContinuationPendingRef.current = false;
+    lastAutoContinuedMentorMessageRef.current = "";
     resetSilenceRecovery();
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
@@ -439,50 +496,6 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     });
   };
 
-  const startFinalResponseWindow = () => {
-    if (!conversationRef.current || !hearingCheckIssuedRef.current) return;
-
-    clearLearnerResponseTimer();
-    hearingCheckSpokenRef.current = true;
-    hearingCheckUtteranceRef.current = null;
-    userManuallyMutedRef.current = false;
-    setUserManuallyMuted(false);
-    setControlState("mentor_waiting_for_answer");
-    learnerResponseTimerRef.current = window.setTimeout(
-      abortUnresponsiveSession,
-      HEARING_CHECK_RESPONSE_WAIT_MS,
-    );
-  };
-
-  const speakHearingCheckLocally = () => {
-    if (!conversationRef.current || !hearingCheckIssuedRef.current || hearingCheckSpokenRef.current) return;
-
-    hearingCheckSpokenRef.current = true;
-    setMicrophoneMuted(true);
-    setControlState("mentor_speaking");
-    debugMentorControls("using local hearing check fallback");
-
-    if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance === "undefined") {
-      startFinalResponseWindow();
-      return;
-    }
-
-    const utterance = new window.SpeechSynthesisUtterance("Can you hear me?");
-    const femaleVoice = pickFemaleEnglishSpeechVoice(window.speechSynthesis.getVoices());
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
-      utterance.lang = femaleVoice.lang;
-    } else {
-      utterance.lang = "en-US";
-    }
-    utterance.rate = 0.95;
-    utterance.pitch = 1.08;
-    hearingCheckUtteranceRef.current = utterance;
-    utterance.onend = startFinalResponseWindow;
-    utterance.onerror = startFinalResponseWindow;
-    window.speechSynthesis.speak(utterance);
-  };
-
   const requestHearingCheck = () => {
     const conversation = conversationRef.current;
     if (!conversation) return;
@@ -511,10 +524,22 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       debugMentorControls("hearing check failed", error);
     }
 
-    learnerResponseTimerRef.current = window.setTimeout(
-      speakHearingCheckLocally,
-      HEARING_CHECK_FALLBACK_WAIT_MS,
+  };
+
+  const handleVadScore = ({ vadScore }: { vadScore: number }) => {
+    if (stateRef.current !== "mentor_waiting_for_answer" || hearingCheckIssuedRef.current) return;
+
+    learnerVoiceActivitySamplesRef.current = advanceVoiceActivitySamples(
+      learnerVoiceActivitySamplesRef.current,
+      vadScore,
+      LEARNER_VOICE_ACTIVITY_THRESHOLD,
     );
+    if (learnerVoiceActivitySamplesRef.current < LEARNER_VOICE_ACTIVITY_SAMPLES || learnerVoiceDetectedRef.current) return;
+
+    learnerVoiceDetectedRef.current = true;
+    clearLearnerResponseTimer();
+    appendDebugEvent("audio", "learner voice detected; silence watchdog cancelled", { vadScore });
+    setControlState("user_speaking");
   };
 
   const extractMessageText = (message: any) => {
@@ -529,25 +554,39 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     const text = extractMessageText(message);
     const source = extractMessageSource(message);
 
+    appendDebugEvent("message", source || "unknown source", message);
+
     if (!text) return;
 
     if (source === "user") {
+      if (text.trim() === STARTUP_CONTINUATION_REQUEST) return;
+      if (text.trim() === TURN_CONTINUATION_REQUEST) return;
       if (text.trim() === getHearingCheckRequest()) return;
       resetSilenceRecovery();
-      if (stateRef.current === "mentor_waiting_for_answer" || stateRef.current === "user_question_mode") {
-        setControlState("user_speaking");
+      if (
+        stateRef.current === "mentor_waiting_for_answer"
+        || stateRef.current === "user_question_mode"
+        || stateRef.current === "user_speaking"
+      ) {
+        setMicrophoneMuted(true);
+        setControlState("mentor_thinking");
       }
       return;
     }
 
     if (source === "ai" || source === "agent" || source === "assistant") {
+      if (!initialGreetingReceivedRef.current) {
+        initialGreetingReceivedRef.current = true;
+      }
       lastMentorMessageRef.current = text;
       setLastMentorMessage(text);
+      questionToolPendingRef.current = isMentorQuestionLeadIn(text);
       debugMentorControls("mentor message", text);
 
       if (
         closingSummaryCompletedRef.current &&
-        closingEvaluationCompletedRef.current
+        closingEvaluationCompletedRef.current &&
+        isClosingFarewellMessage(text)
       ) {
         closingFarewellDetectedRef.current = true;
       }
@@ -558,9 +597,38 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  const continueAfterInitialGreeting = () => {
+    if (startupContinuationSentRef.current) return;
+    const conversation = conversationRef.current;
+    if (!conversation?.sendUserMessage) {
+      startupContinuationPendingRef.current = true;
+      appendDebugEvent("startup", "workflow continuation queued until SDK is ready");
+      return;
+    }
+
+    startupContinuationPendingRef.current = false;
+    startupContinuationSentRef.current = true;
+    appendDebugEvent("startup", "continuing workflow after initial greeting");
+    try {
+      const continuation = conversation.sendUserMessage(STARTUP_CONTINUATION_REQUEST);
+      if (continuation && typeof (continuation as Promise<void>).catch === "function") {
+        (continuation as Promise<void>).catch((error) => {
+          appendDebugEvent("error", "startup continuation failed", error);
+          setErrorMessage("The mentor could not continue after its greeting.");
+          setControlState("error");
+        });
+      }
+    } catch (error) {
+      appendDebugEvent("error", "startup continuation failed", error);
+      setErrorMessage("The mentor could not continue after its greeting.");
+      setControlState("error");
+    }
+  };
+
   const handleModeChange = (modeEvent: any) => {
     const nextMode = String(modeEvent?.mode ?? modeEvent ?? "").toLowerCase();
     debugMentorControls("mode event", modeEvent);
+    appendDebugEvent("sdk", "mode changed", modeEvent);
 
     if (nextMode === "speaking") {
       clearLearnerResponseTimer();
@@ -594,7 +662,50 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         return;
       }
 
+      if (initialGreetingReceivedRef.current && !startupContinuationSentRef.current) {
+        setMicrophoneMuted(true);
+        setControlState("mentor_speaking");
+        continueAfterInitialGreeting();
+        return;
+      }
+
+      if (stateRef.current === "mentor_thinking") {
+        setMicrophoneMuted(true);
+        return;
+      }
+
+      const lastMentorMessage = lastMentorMessageRef.current.trim();
+      if (questionToolPendingRef.current) {
+        setMicrophoneMuted(true);
+        setControlState("mentor_speaking");
+        appendDebugEvent("question", "waiting for question tool after mentor lead-in");
+        return;
+      }
+      if (
+        shouldAutoContinueMentorTurn(lastMentorMessage, learnerAnswerExpectedRef.current)
+        && lastAutoContinuedMentorMessageRef.current !== lastMentorMessage
+      ) {
+        lastAutoContinuedMentorMessageRef.current = lastMentorMessage;
+        learnerAnswerExpectedRef.current = false;
+        setMicrophoneMuted(true);
+        setControlState("mentor_speaking");
+        appendDebugEvent("continuation", "declarative mentor turn continued without learner acknowledgment");
+        try {
+          const continuation = conversationRef.current?.sendUserMessage?.(TURN_CONTINUATION_REQUEST);
+          if (continuation && typeof (continuation as Promise<void>).catch === "function") {
+            (continuation as Promise<void>).catch((error) => {
+              appendDebugEvent("error", "automatic turn continuation failed", error);
+            });
+          }
+        } catch (error) {
+          appendDebugEvent("error", "automatic turn continuation failed", error);
+        }
+        return;
+      }
+
       learnerAnswerExpectedRef.current = false;
+      learnerVoiceActivitySamplesRef.current = 0;
+      learnerVoiceDetectedRef.current = false;
       userManuallyMutedRef.current = false;
       setUserManuallyMuted(false);
       setControlState("mentor_waiting_for_answer");
@@ -615,7 +726,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     clearPendingUnmute();
 
-    if (mentorSessionState === "mentor_speaking" || mentorSessionState === "connecting" || mentorSessionState === "muted_waiting") {
+    if (mentorSessionState === "mentor_speaking" || mentorSessionState === "mentor_thinking" || mentorSessionState === "connecting" || mentorSessionState === "muted_waiting") {
       setMicrophoneMuted(true);
       return;
     }
@@ -735,7 +846,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const handleStartConversation = async () => {
+    setDebugEvents([]);
+    debugEventIdRef.current = 0;
     if (mentorSessionState === "connecting" || isSessionActive) return;
+    const sessionGeneration = ++sessionGenerationRef.current;
 
     pendingCurrentEvaluationRef.current = null;
     pendingSummarySlideRef.current = null;
@@ -743,13 +857,27 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     closingEvaluationCompletedRef.current = false;
     closingFarewellDetectedRef.current = false;
     learnerAnswerExpectedRef.current = false;
+    questionToolPendingRef.current = false;
     resetSilenceRecovery();
     presentationFinalizedRef.current = false;
-    onLessonPresentationChange?.(null);
+    onLessonPresentationChange?.(createInitialCoachingDiscussionSlide({
+      conversationType: conversationtype,
+      courseGoal: coursegoal,
+      learnerGoal: userlearninggoal,
+      userPreferences: userpreferences,
+      knowledgeDomain: knowledgedomain,
+      relationshipContext: relationshipcontext,
+    }));
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
     setTokenSupportDebugMessage("");
-    applyLessonPhase(INITIAL_LESSON_PHASE);
+    initialGreetingReceivedRef.current = false;
+    startupContinuationSentRef.current = false;
+    startupContinuationPendingRef.current = false;
+    lastAutoContinuedMentorMessageRef.current = "";
+    applyLessonPhase(initialLessonPhase(conversationtype));
+    relationshipPhaseAcknowledgedRef.current = conversationtype !== "COURSE_CALIBRATION"
+      && conversationtype !== "WEEKLY_CHECKPOINT";
     previousReviewActiveRef.current = false;
     previousReviewFeedbackCountRef.current = 0;
     deferredLessonPhaseRef.current = null;
@@ -787,6 +915,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         body: JSON.stringify({ data: signedData, sig: signedSig }),
       });
       const data = await res.json().catch(() => null);
+      const responseDebugMode = data?.debug?.debugMode === true;
+      debugModeRef.current = responseDebugMode;
+      setDebugMode(responseDebugMode);
+      if (responseDebugMode) {
+        appendDebugEvent("bootstrap", "debug mode enabled", {
+          httpStatus: res.status,
+          mentorContextMode: data?.mentor_context_mode,
+          mentorSessionId: data?.mentor_session_id || mentorSessionId || null,
+          tokenAvailability: data?.debug?.tokenAvailability,
+        });
+      }
       const tokenDebugMessage = getTokenDebugMessage(data);
 
       if (tokenDebugMessage) {
@@ -831,6 +970,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             knowledgelevel: knowledgelevel || "beginner",
             knowledgedomain: knowledgedomain || "",
             userpreferences: userpreferences || "",
+            speakingspeed: "normal",
             content: content || "",
             learningmemory: learningmemory || "[]",
             knowledgestrengths: knowledgestrengths || "[]",
@@ -844,49 +984,105 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             relationship_prompt_version: relationshippromptversion || "lesson-v1",
             relationship_definition: relationshipdefinition || "{}",
             relationship_context: relationshipcontext || "{}",
+            active_workflow_instruction: conversationtype === "COURSE_CALIBRATION"
+              ? "Mandatory: complete the course calibration coaching phase before starting introduction, review, calibration questions, or lesson teaching. Then continue into the normal lesson workflow in this same call."
+              : conversationtype === "WEEKLY_CHECKPOINT"
+                ? "Mandatory: complete the weekly coaching checkpoint before starting introduction, review, calibration questions, or lesson teaching. Then continue into the normal lesson workflow in this same call."
+                : "Run the normal lesson workflow.",
             previous_lesson_evaluation: JSON.stringify(previousLessonEvaluation ?? null),
+            debug_mode: responseDebugMode,
           }
         : {
             userfirstname: userfirstname || "User",
             coursename: coursename || "Unknown Course",
             lessonname: lessonname || "Untitled Lesson",
             knowledgelevel: knowledgelevel || "beginner",
+            knowledgedomain: knowledgedomain || "",
+            userpreferences: userpreferences || "",
+            speakingspeed: "normal",
             content: content || "",
-            ...(activeMentorSessionId ? { mentor_session_id: activeMentorSessionId } : {}),
+            learningmemory: learningmemory || "[]",
+            knowledgestrengths: knowledgestrengths || "[]",
+            knowledgegaps: knowledgegaps || "[]",
+            practicerecommendations: practicerecommendations || "[]",
+            userlearninggoal: userlearninggoal || "",
+            coursegoal: coursegoal || "",
+            courseprogress: courseprogress || "{}",
+            conversation_type: conversationtype || "NORMAL_LESSON",
+            relationship_period_key: relationshipperiodkey || "",
+            relationship_prompt_version: relationshippromptversion || "lesson-v1",
+            relationship_definition: relationshipdefinition || "{}",
+            relationship_context: relationshipcontext || "{}",
+            active_workflow_instruction: conversationtype === "COURSE_CALIBRATION"
+              ? "Mandatory: complete the course calibration coaching phase before starting introduction, review, calibration questions, or lesson teaching. Then continue into the normal lesson workflow in this same call."
+              : conversationtype === "WEEKLY_CHECKPOINT"
+                ? "Mandatory: complete the weekly coaching checkpoint before starting introduction, review, calibration questions, or lesson teaching. Then continue into the normal lesson workflow in this same call."
+                : "Run the normal lesson workflow.",
+            previous_lesson_evaluation: JSON.stringify(previousLessonEvaluation ?? null),
+            user_id: userId || "",
+            subscription_id: subscriptionId || "",
+            course_id: courseId || "",
+            lesson_id: lessonId || "",
+            mentor_session_id: activeMentorSessionId || "",
+            debug_mode: responseDebugMode,
           };
+
+      appendDebugEvent("parameters", "dynamic variables prepared", dynamicVariables);
 
       const convo = await Conversation.startSession({
         signedUrl: data.signed_url,
         connectionType: "websocket",
         dynamicVariables,
         onConnect: () => {
+          if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
           debugMentorControls("session connected");
+          appendDebugEvent("sdk", "session connected");
           sessionStartedAtRef.current = Date.now();
           setSessionProgress(0);
           setSessionElapsedSeconds(0);
           setHasElevenLabsSessionStarted(true);
         },
         onDisconnect: (details: DisconnectionDetails) => {
+          if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) {
+            debugMentorControls("ignored stale session disconnect", details);
+            return;
+          }
           const disconnectMessage = userRequestedEndRef.current ? null : getDisconnectMessage(details);
           debugMentorControls("session disconnected", {
             reason: details.reason,
             closeCode: "closeCode" in details ? details.closeCode : undefined,
           });
+          appendDebugEvent("sdk", "session disconnected", details);
           finalizeLessonPresentation();
           setErrorMessage(disconnectMessage);
           userRequestedEndRef.current = false;
           resetSessionState("disconnected");
         },
         onError: (error: unknown) => {
+          if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
+          appendDebugEvent("error", "ElevenLabs session error", error);
+          if (isRecoverableClientToolError(error)) {
+            appendDebugEvent("sdk", "recoverable client tool error ignored; session remains active");
+            return;
+          }
           setErrorMessage(getReadableError(error));
           resetSessionState("error");
         },
         onStatusChange: (status: any) => {
+          if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
           debugMentorControls("status event", status);
+          appendDebugEvent("sdk", "status changed", status);
         },
-        onModeChange: handleModeChange,
-        onMessage: handleMentorMessage,
-        clientTools: {
+        onModeChange: (event: any) => {
+          if (isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) handleModeChange(event);
+        },
+        onVadScore: (event: { vadScore: number }) => {
+          if (isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) handleVadScore(event);
+        },
+        onMessage: (message: any) => {
+          if (isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) handleMentorMessage(message);
+        },
+        clientTools: instrumentClientTools({
           logMessage: async (payload: any) => {
             handleMentorMessage({ source: "agent", message: payload?.message ?? payload });
           },
@@ -894,12 +1090,33 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             handleMentorMessage({ source: "user", message: payload?.message ?? payload });
           },
           onEnd: async () => {
+            if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
             finalizeLessonPresentation();
-            resetSessionState("disconnected");
+            appendDebugEvent("sdk", "agent requested session end; waiting for transport disconnect");
           },
           showLessonPhase: async (payload: LessonPhaseInput) => {
-            const phase = normalizeLessonPhase(payload);
+            const phase = normalizeLessonPhase(payload, conversationtype);
             if (!phase) throw new Error("Unknown lesson phase. Use one of the fixed BiteCode phase identifiers.");
+
+            const requiredRelationshipPhase = conversationtype === "COURSE_CALIBRATION"
+              ? "course_calibration"
+              : conversationtype === "WEEKLY_CHECKPOINT"
+                ? "weekly_checkpoint"
+                : null;
+            if (requiredRelationshipPhase && !relationshipPhaseAcknowledgedRef.current) {
+              if (phase.id !== requiredRelationshipPhase) {
+                return `The ${requiredRelationshipPhase} phase has not been acknowledged yet. Continue the relationship conversation and call showCoachingRecap before entering the lesson workflow.`;
+              }
+              relationshipPhaseAcknowledgedRef.current = true;
+            }
+
+            if (requiredRelationshipPhase && phase.id !== requiredRelationshipPhase) {
+              if (phase.id === "main_lesson") {
+                onLessonPresentationChange?.(createMainLessonTopicSlide(lessonname, content));
+              } else if (phase.id === "introduction" || phase.id === "previous_lesson_review" || phase.id === "calibration") {
+                onLessonPresentationChange?.(null);
+              }
+            }
 
             if (phase.id === "previous_lesson_review") {
               previousReviewActiveRef.current = true;
@@ -934,17 +1151,42 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             return "Displayed the current topic in the lesson presentation area.";
           },
           showLessonReview: async (payload: ReviewSlideInput) => {
+            if (conversationtype !== "NORMAL_LESSON" && !relationshipPhaseAcknowledgedRef.current) {
+              throw new Error("Complete the mandatory relationship coaching phase before showing the previous lesson review.");
+            }
             const title = normalizePresentationText(payload?.title, "Your previous lesson", 180);
             const wentWell = normalizePresentationItems(payload?.wentWell, 4);
             const checkAgain = normalizePresentationItems(payload?.checkAgain, 4);
             if (!wentWell.length && !checkAgain.length) throw new Error("Lesson recap requires at least one supported point.");
-            const reviewPhase = normalizeLessonPhase({ phase: "previous_lesson_review" });
+            const reviewPhase = normalizeLessonPhase({ phase: "previous_lesson_review" }, conversationtype);
             if (reviewPhase) applyLessonPhase(reviewPhase);
             previousReviewActiveRef.current = true;
             previousReviewFeedbackCountRef.current = 0;
             deferredLessonPhaseRef.current = null;
             onLessonPresentationChange?.({ type: "review", title, wentWell, checkAgain });
             return "Displayed the short previous-lesson recap. Continue the planned lesson without adding a review loop.";
+          },
+          showCoachingDiscussion: async (payload: CoachingDiscussionSlideInput) => {
+            if (conversationtype !== "COURSE_CALIBRATION" && conversationtype !== "WEEKLY_CHECKPOINT") {
+              throw new Error("Coaching discussion cards are available only during course calibration or weekly checkpoint sessions.");
+            }
+            const defaultTitle = conversationtype === "COURSE_CALIBRATION" ? "Your goals and learning preferences" : "This week's checkpoint";
+            const title = normalizePresentationText(payload?.title, defaultTitle, 180);
+            const points = normalizeCoachingDiscussionPoints(payload?.points, 6);
+            if (!points.length) throw new Error("A coaching discussion card requires at least one discussion topic.");
+            onLessonPresentationChange?.({ type: "coaching_discussion", title, points });
+            return `Displayed ${points.length} discussed point${points.length === 1 ? "" : "s"}, including the learner's stated input.`;
+          },
+          showCoachingRecap: async (payload: CoachingRecapSlideInput) => {
+            if (conversationtype !== "COURSE_CALIBRATION" && conversationtype !== "WEEKLY_CHECKPOINT") {
+              throw new Error("Coaching recap cards are available only during course calibration or weekly checkpoint sessions.");
+            }
+            const title = normalizePresentationText(payload?.title, "What we discussed", 180);
+            const points = normalizePresentationItems(payload?.points, 3);
+            if (!points.length) throw new Error("A coaching recap card requires at least one supported takeaway.");
+            relationshipPhaseAcknowledgedRef.current = true;
+            onLessonPresentationChange?.({ type: "coaching_recap", title, points });
+            return `Displayed the coaching recap with ${points.length} main point${points.length === 1 ? "" : "s"}.`;
           },
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
@@ -954,6 +1196,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               pendingKnowledgeCheckPhaseRef.current = null;
             }
             learnerAnswerExpectedRef.current = true;
+            questionToolPendingRef.current = false;
             onLessonPresentationChange?.({
               type: "question",
               questionKind: "explanation",
@@ -969,6 +1212,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               pendingKnowledgeCheckPhaseRef.current = null;
             }
             learnerAnswerExpectedRef.current = true;
+            questionToolPendingRef.current = false;
             onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
             return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
           },
@@ -980,6 +1224,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               pendingKnowledgeCheckPhaseRef.current = null;
             }
             learnerAnswerExpectedRef.current = true;
+            questionToolPendingRef.current = false;
             onLessonPresentationChange?.({ type: "question", questionKind: "explanation", question });
             return "Displayed the explanation question. Speak the exact question now without any intervening words.";
           },
@@ -1071,12 +1316,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               debugMentorControls("lesson evaluation persistence failed", getReadableError(error));
             }
             closingEvaluationCompletedRef.current = true;
-            return `Processed the lesson outcome: ${evaluation.status}. Do not add another teaching or reinforcement loop. Finish the normal spoken wrap-up and end the session; the result will appear after the call ends.`;
+            return `Processed the lesson outcome: ${evaluation.status}. Do not add another teaching or reinforcement loop. Speak one short declarative farewell, without asking a question or offering more help, and then end the session. The result will appear after the call ends.`;
           },
-        },
+        }, appendDebugEvent),
       });
 
+      if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) {
+        await Promise.resolve((convo as ConversationInstance).endSession?.());
+        return;
+      }
+
       conversationRef.current = convo as ConversationInstance;
+      if (startupContinuationPendingRef.current) {
+        continueAfterInitialGreeting();
+      }
       setMicrophoneMuted(true);
       if (!usageRegistrationStartedRef.current) {
         usageRegistrationStartedRef.current = true;
@@ -1088,6 +1341,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       setConnectionStatusMessage("");
       debugMentorControls("dynamic variables sent", { userfirstname, coursename, lessonname, knowledgelevel });
     } catch (error) {
+      if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
       setErrorMessage(getReadableError(error));
       resetSessionState("error");
     }
@@ -1139,6 +1393,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const getStatusLabel = () => {
     if (mentorSessionState === "connecting") return "Connecting...";
     if (mentorSessionState === "mentor_speaking") return "Mentor is explaining...";
+    if (mentorSessionState === "mentor_thinking") return "Agent is thinking...";
     if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn";
     if (mentorSessionState === "user_question_mode") return "Listening to your question...";
     if (mentorSessionState === "user_speaking") return "Listening to your answer...";
@@ -1159,6 +1414,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     : null;
 
   return (
+    <div className="mentor-panel-stack">
     <div className="mentor-panel-shell relative h-full min-h-[500px] overflow-hidden rounded-3xl bg-gradient-to-br from-[#F6F6F6] to-[#ECE9E6] lg:min-h-[600px]">
       <div className="absolute left-0 right-0 top-0 h-[66%] overflow-hidden lg:h-full">
         <video
@@ -1229,7 +1485,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         >
           <div className="mentor-status-content">
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
-            {mentorSessionState === "connecting" && <div className="mentor-status-spinner" />}
+            {(mentorSessionState === "connecting" || mentorSessionState === "mentor_thinking") && <div className="mentor-status-spinner" />}
             <div className="mentor-status-text">
               <p>{activeTopicHeader?.primary || statusLabel}</p>
               {activeTopicHeader?.secondary && <span className="mentor-status-secondary">{activeTopicHeader.secondary}</span>}
@@ -1307,6 +1563,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           onEndSession={handleEndConversation}
         />
       )}
+    </div>
+    {debugMode && <MentorDebugPanel events={debugEvents} />}
     </div>
   );
 };

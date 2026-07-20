@@ -2076,6 +2076,137 @@ html {
   box-shadow: 0 12px 32px rgba(51, 51, 51, .08) !important;
 }
 
+.mentor-panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mentor-debug-panel {
+  overflow: hidden;
+  border: 1px solid #263447;
+  border-radius: 14px;
+  background: #0b1220;
+  box-shadow: 0 12px 30px rgba(8, 15, 29, 0.16);
+  color: #d7e2f0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.mentor-debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #263447;
+  background: #111c2e;
+  color: #f1f6fc;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mentor-debug-live {
+  border-radius: 999px;
+  background: #00ce8d;
+  padding: 2px 7px;
+  color: #052a20;
+  font-size: 9px;
+}
+
+.mentor-debug-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mentor-debug-copy {
+  border: 1px solid #52647b;
+  border-radius: 6px;
+  background: #1a2a40;
+  padding: 5px 8px;
+  color: #e7eef7;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mentor-debug-copy:hover:not(:disabled) {
+  border-color: #00ce8d;
+  color: #7fffd4;
+}
+
+.mentor-debug-copy:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.mentor-debug-copy-copied {
+  border-color: #00ce8d;
+  background: #073c2e;
+  color: #7fffd4;
+}
+
+.mentor-debug-copy-error {
+  border-color: #ff7b7b;
+  background: #421d26;
+  color: #ffb5b5;
+}
+
+.mentor-debug-stream {
+  height: 260px;
+  overflow: auto;
+  padding: 8px 10px 12px;
+  font-size: 10px;
+  line-height: 1.45;
+  scrollbar-color: #53657c #0b1220;
+}
+
+.mentor-debug-empty {
+  padding: 8px 2px;
+  color: #8292a8;
+}
+
+.mentor-debug-entry {
+  padding: 7px 2px;
+  border-bottom: 1px solid rgba(123, 145, 171, 0.18);
+}
+
+.mentor-debug-entry-heading {
+  display: grid;
+  grid-template-columns: 58px max-content 1fr;
+  gap: 7px;
+  align-items: baseline;
+}
+
+.mentor-debug-entry-heading time {
+  color: #8191a7;
+}
+
+.mentor-debug-entry-heading span {
+  color: #00ce8d;
+  text-transform: uppercase;
+}
+
+.mentor-debug-entry-heading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #e6edf6;
+  font-weight: 600;
+}
+
+.mentor-debug-entry pre {
+  margin: 5px 0 0 65px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: #aebed1;
+  font-family: inherit;
+}
+
 .lesson-shell {
   padding: 28px !important;
 }
@@ -2949,6 +3080,79 @@ html {
 .lesson-stage-recap-good h4 { color: #007955; }
 .lesson-stage-recap-check h4 { color: #9a5705; }
 .lesson-stage-recap-check .lesson-stage-list li > span:first-child { color: #e98a10; }
+
+.lesson-stage-coaching,
+.lesson-stage-coaching-recap {
+  border-left-color: #00a976;
+  background: linear-gradient(145deg, #f5fffb 0%, #f8fafc 70%);
+}
+
+.lesson-stage-coaching .lesson-stage-heading,
+.lesson-stage-coaching-recap .lesson-stage-heading { color: #008e64; }
+
+.lesson-stage-coaching-points {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+}
+
+.lesson-stage-coaching-points > div {
+  padding: 13px 15px;
+  background: #fff;
+  border: 1px solid #d8e8e2;
+  border-radius: 9px;
+}
+
+.lesson-stage-coaching-points dt {
+  color: #087153;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.lesson-stage-coaching-points dd {
+  margin: 5px 0 0;
+  color: #34383e;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.lesson-stage-takeaway-list {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: coaching-takeaway;
+}
+
+.lesson-stage-takeaway-list li {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 11px;
+  align-items: center;
+  padding: 12px 14px;
+  color: #34383e;
+  background: #fff;
+  border: 1px solid #d8e8e2;
+  border-radius: 9px;
+  line-height: 1.45;
+  counter-increment: coaching-takeaway;
+}
+
+.lesson-stage-takeaway-list li::before {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: #fff;
+  background: #00a976;
+  border-radius: 50%;
+  content: counter(coaching-takeaway);
+  font-size: .78rem;
+  font-weight: 800;
+}
 
 .lesson-stage-question {
   display: flex;

@@ -1,11 +1,11 @@
 {
   "type": "client",
   "name": "showLessonPhase",
-  "description": "Notify BiteCode that the lesson entered one fixed workflow phase after introduction. BiteCode automatically starts at Introduction, so never call this tool for introduction. When previous lesson review is active, send calibration only after both review questions have been answered and received feedback. BiteCode owns the order, total, label, and safely defers premature calibration events.",
-  "expects_response": true,
-  "response_timeout_secs": 5,
+  "description": "Silently notify BiteCode that the session entered a fixed workflow phase. This is a one-way visual update: never announce, describe, confirm, or summarize the tool call. Relationship branches may send their relationship phase and then introduction when coaching is complete. BiteCode owns the displayed order, total, and label.",
+  "expects_response": false,
+  "response_timeout_secs": 1,
   "parameters": [
-    { "id": "phase", "type": "string", "description": "Fixed later-phase identifier. Use exactly one of: previous_lesson_review, calibration, main_lesson, knowledge_check, session_wrap_up. Never send introduction.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": ["previous_lesson_review", "calibration", "main_lesson", "knowledge_check", "session_wrap_up"] }
+    { "id": "phase", "type": "string", "description": "Fixed phase identifier. Use course_calibration or weekly_checkpoint only in its matching relationship branch. Use introduction after relationship coaching completes. Normal lesson phases are previous_lesson_review, calibration, main_lesson, knowledge_check, and session_wrap_up.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": ["course_calibration", "weekly_checkpoint", "introduction", "previous_lesson_review", "calibration", "main_lesson", "knowledge_check", "session_wrap_up"] }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

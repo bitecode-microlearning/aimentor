@@ -2,6 +2,7 @@ export type MentorControlState =
   | "idle"
   | "connecting"
   | "mentor_speaking"
+  | "mentor_thinking"
   | "user_question_mode"
   | "mentor_waiting_for_answer"
   | "user_speaking"
@@ -31,8 +32,40 @@ export function isMentorAskingQuestion(message: string): boolean {
   return questionPhrases.some((phrase) => normalized.includes(phrase));
 }
 
+export function shouldAutoContinueMentorTurn(message: string, explicitAnswerExpected: boolean): boolean {
+  return Boolean(message.trim()) && !explicitAnswerExpected && !isMentorAskingQuestion(message);
+}
+
+export function isMentorQuestionLeadIn(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/[’]/g, "'");
+  if (!normalized) return false;
+
+  return /(?:here(?:'s| is) (?:a|the|your|next) question|here(?:'s| is) (?:a|the|your|next) check|showing (?:a|the|your|next) (?:question|check)|next (?:question|check))\.?\s*$/.test(normalized);
+}
+
+export function isClosingFarewellMessage(message: string): boolean {
+  const normalized = message.trim().toLowerCase().replace(/[’]/g, "'");
+  if (!normalized || isMentorAskingQuestion(normalized)) return false;
+
+  return /\b(?:goodbye|bye for now|see you|talk to you|until next time|take care|great work today|nice work today|thanks for learning|thank you for learning)\b/.test(normalized);
+}
+
 export function getHearingCheckRequest(): string {
   return "Sorry, I didn't answer. Could you check whether I can hear you?";
+}
+
+export function advanceVoiceActivitySamples(currentSamples: number, vadScore: number, threshold: number): number {
+  if (!Number.isFinite(vadScore) || vadScore < threshold) return 0;
+  return currentSamples + 1;
+}
+
+export function isCurrentSessionGeneration(callbackGeneration: number, activeGeneration: number): boolean {
+  return callbackGeneration === activeGeneration;
+}
+
+export function isRecoverableClientToolError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /client tool execution failed/i.test(message);
 }
 
 export function debugMentorControls(message: string, data?: unknown) {

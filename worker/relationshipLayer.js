@@ -50,6 +50,14 @@ export function isoWeekKey(now, timezone) {
 export function resolveConversationType(state, config, now = new Date()) {
   if (!config.enabled) return { type: CONVERSATION_TYPES.NORMAL_LESSON, periodKey: null, reason: "feature_disabled" };
   const periodKey = isoWeekKey(now, config.timezone);
+  const forcedType = String(state.forceOverride || "").trim().toUpperCase();
+  if (forcedType in DEFINITIONS) {
+    return {
+      type: forcedType,
+      periodKey: forcedType === CONVERSATION_TYPES.WEEKLY_CHECKPOINT ? periodKey : null,
+      reason: "user_force_override",
+    };
+  }
   if (config.calibrationEnabled && !state.calibrationCompleted) {
     if (isResumable(state.activeCalibrationStartedAt, config, now)) {
       return { type: CONVERSATION_TYPES.COURSE_CALIBRATION, periodKey: null, reason: "calibration_retry" };

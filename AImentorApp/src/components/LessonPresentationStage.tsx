@@ -1,5 +1,5 @@
 import React from "react";
-import { BookOpen, CheckCircle2, CircleHelp, ClipboardCheck, Code2, ListChecks, RefreshCw, Sparkles, XCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, CircleHelp, ClipboardCheck, Code2, ListChecks, RefreshCw, Sparkles, Target, XCircle } from "lucide-react";
 import type { LessonEvaluation } from "../domain/lessonUnderstanding";
 import type { LessonPresentationSlide } from "../domain/lessonPresentation";
 import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
@@ -100,6 +100,35 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
             <SlideList items={slide.checkAgain} />
           </div>
         </div>
+      </section>
+    );
+  }
+
+  if (slide.type === "coaching_discussion") {
+    return (
+      <section className="lesson-stage lesson-stage-coaching" aria-live="polite">
+        <div className="lesson-stage-heading"><Target size={28} aria-hidden="true" /><p>Goals and priorities</p></div>
+        <h3>{slide.title}</h3>
+        <dl className="lesson-stage-coaching-points">
+          {slide.points.map((point, index) => (
+            <div key={`${index}-${point.topic}`}>
+              <dt>{point.topic}</dt>
+              {point.learnerInput && <dd>&ldquo;{point.learnerInput}&rdquo;</dd>}
+            </div>
+          ))}
+        </dl>
+      </section>
+    );
+  }
+
+  if (slide.type === "coaching_recap") {
+    return (
+      <section className="lesson-stage lesson-stage-coaching-recap" aria-live="polite">
+        <div className="lesson-stage-heading"><Target size={28} aria-hidden="true" /><p>Coaching recap</p></div>
+        <h3>{slide.title}</h3>
+        <ol className="lesson-stage-takeaway-list">
+          {slide.points.map((point, index) => <li key={`${index}-${point}`}>{point}</li>)}
+        </ol>
       </section>
     );
   }

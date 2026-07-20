@@ -46,8 +46,8 @@ function getMinimumAvailableTokens(env) {
   return configuredLimit;
 }
 
-function isDebugMode(env) {
-  return String(env.DEBUG_MODE ?? "") === "1";
+function isDebugMode(value) {
+  return value === true || value === 1 || String(value ?? "").trim() === "1";
 }
 
 async function fetchElevenLabsJson(apiUrl, env) {
@@ -124,8 +124,8 @@ async function getTokenAvailability(env) {
   };
 }
 
-function buildDebugPayload(env, tokenAvailability) {
-  if (!isDebugMode(env)) return undefined;
+function buildDebugPayload(debugMode, tokenAvailability) {
+  if (!isDebugMode(debugMode)) return undefined;
 
   return {
     debugMode: true,
@@ -133,8 +133,8 @@ function buildDebugPayload(env, tokenAvailability) {
   };
 }
 
-function withDebugPayload(body, env, tokenAvailability) {
-  const debug = buildDebugPayload(env, tokenAvailability);
+function withDebugPayload(body, debugMode, tokenAvailability) {
+  const debug = buildDebugPayload(debugMode, tokenAvailability);
 
   if (!debug) return body;
 
@@ -144,7 +144,7 @@ function withDebugPayload(body, env, tokenAvailability) {
   };
 }
 
-async function ensureEnoughAvailableTokens(env, corsHeaders) {
+async function ensureEnoughAvailableTokens(env, corsHeaders, debugMode = false) {
   const tokenAvailability = await getTokenAvailability(env);
 
   if (tokenAvailability.availableTokens < tokenAvailability.minimumAvailableTokens) {
@@ -156,7 +156,7 @@ async function ensureEnoughAvailableTokens(env, corsHeaders) {
           availableTokens: tokenAvailability.availableTokens,
           minimumAvailableTokens: tokenAvailability.minimumAvailableTokens,
         },
-        env,
+        debugMode,
         tokenAvailability
       ),
       503,
@@ -314,7 +314,8 @@ async function resolveMentorContext(lessonData, env) {
   const courseid = Number(lessonData.courseid);
   const lessonid = Number(lessonData.lessonid);
   const context = await env.DB.prepare(
-    `SELECT u.firstname AS userfirstname, s.knowledgelevel, s.knowledgedomain, s.userpreferences,
+    `SELECT u.firstname AS userfirstname, u.nextlessontypeforceoverride, u.debugmode,
+            s.knowledgelevel, s.knowledgedomain, s.userpreferences,
             s.streakcount, s.unopenedcount, p.learning_goal AS userlearninggoal,
             p.timezone AS usertimezone,
             c.name AS coursename, c.learninggoal AS coursegoal,
@@ -378,7 +379,10 @@ async function resolveMentorContext(lessonData, env) {
   const routingState = relConfig.enabled
     ? await loadRelationshipRoutingState(env.DB, subscriptionid, currentPeriodKey)
     : {};
-  const route = resolveConversationType(routingState, relConfig);
+  const route = resolveConversationType({
+    ...routingState,
+    forceOverride: context.nextlessontypeforceoverride,
+  }, relConfig);
   const definition = conversationDefinition(route.type, relConfig);
   const relationshipContext = route.type === "NORMAL_LESSON"
     ? "{}"
@@ -435,6 +439,10 @@ async function resolveMentorContext(lessonData, env) {
     relationshipdefinition: JSON.stringify(definition),
     relationshipcontext: relationshipContext,
     relationshiproutingreason: route.reason,
+    nextlessontypeforceoverride: route.reason === "user_force_override"
+      ? bounded(context.nextlessontypeforceoverride, 32).toUpperCase()
+      : "",
+    debugmode: isDebugMode(context.debugmode),
     ...(previousEvaluation ? {
       previouslessonevaluation: {
         lessonId: String(previousEvaluation.lesson_id),
@@ -554,8 +562,17 @@ async function createMentorSession(context, env) {
     context.relationshippromptversion || "lesson-v1",
     context.conversationtype === "NORMAL_LESSON" ? null : "2.0"
   );
-  if (context.conversationtype === "NORMAL_LESSON") await insert.run();
-  else await env.DB.batch([supersede, insert]);
+  const forcedType = bounded(context.nextlessontypeforceoverride, 32).toUpperCase();
+  const consumeOverride = forcedType
+    ? env.DB.prepare(
+      `UPDATE users SET nextlessontypeforceoverride = NULL
+        WHERE id = ?1 AND UPPER(TRIM(nextlessontypeforceoverride)) = ?2`
+    ).bind(context.userid, forcedType)
+    : null;
+  const statements = context.conversationtype === "NORMAL_LESSON" ? [insert] : [supersede, insert];
+  if (consumeOverride) statements.push(consumeOverride);
+  if (statements.length === 1) await insert.run();
+  else await env.DB.batch(statements);
   return mentorSessionId;
 }
 
@@ -801,6 +818,7 @@ export default {
 
         const resolvedContext = await resolveMentorContext(result.lessonData, env);
         const idOnlyBootstrap = isIdOnlyLessonPayload(result.lessonData);
+        const userDebugMode = isDebugMode(resolvedContext?.debugmode);
         const mentorSessionId = demoMode
           ? result.lessonData.demosessionid
           : idOnlyBootstrap ? await createMentorSession(resolvedContext, env) : null;
@@ -808,7 +826,7 @@ export default {
         let tokenAvailability;
 
         try {
-          const tokenLimitResult = await ensureEnoughAvailableTokens(env, corsHeaders);
+          const tokenLimitResult = await ensureEnoughAvailableTokens(env, corsHeaders, userDebugMode);
 
           if (tokenLimitResult instanceof Response) {
             return tokenLimitResult;
@@ -844,7 +862,7 @@ export default {
               {
                 error: `Unable to parse signed session response: ${err.message}`,
               },
-              env,
+                userDebugMode,
               tokenAvailability
             ),
             502,
@@ -854,7 +872,7 @@ export default {
 
         return jsonResponse(
           {
-            ...withDebugPayload(data, env, tokenAvailability),
+            ...withDebugPayload(data, userDebugMode, tokenAvailability),
             mentor_context_mode: demoMode ? "demo" : idOnlyBootstrap ? "app_resolved" : "legacy_content",
             ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
           },

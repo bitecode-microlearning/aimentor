@@ -13,6 +13,22 @@ test("disabled relationship layer preserves normal lesson routing", () => {
   assert.equal(resolveConversationType({}, relationshipConfig({})).type, "NORMAL_LESSON");
 });
 
+test("a valid user override forces any supported conversation type", () => {
+  assert.deepEqual(
+    resolveConversationType({ forceOverride: "WEEKLY_CHECKPOINT" }, enabled, new Date("2026-07-20T12:00:00Z")),
+    { type: "WEEKLY_CHECKPOINT", periodKey: "2026-W30", reason: "user_force_override" },
+  );
+  assert.equal(resolveConversationType({ forceOverride: "NORMAL_LESSON" }, enabled).type, "NORMAL_LESSON");
+  assert.equal(resolveConversationType({ forceOverride: "COURSE_CALIBRATION" }, enabled).type, "COURSE_CALIBRATION");
+});
+
+test("the global rollback flag takes precedence over a force override", () => {
+  assert.equal(
+    resolveConversationType({ forceOverride: "WEEKLY_CHECKPOINT" }, relationshipConfig({})).type,
+    "NORMAL_LESSON",
+  );
+});
+
 test("incomplete calibration has priority", () => {
   const result = resolveConversationType({ calibrationCompleted: false, calibrationAttempts: 0 }, enabled, new Date("2026-07-20T08:00:00Z"));
   assert.equal(result.type, "COURSE_CALIBRATION");
