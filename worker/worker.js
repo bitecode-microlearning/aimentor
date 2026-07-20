@@ -1,3 +1,12 @@
+import {
+  assembleRelationshipContext,
+  conversationDefinition,
+  isoWeekKey,
+  loadRelationshipRoutingState,
+  relationshipConfig,
+  resolveConversationType,
+} from "./relationshipLayer.js";
+
 const DEFAULT_MIN_AVAILABLE_TOKENS = 2000;
 const TOKEN_UNAVAILABLE_ERROR =
   "We have run out of available tokens, so this service is currently unavailable. If you would like to use it and have the capacity to help, please support the system on Buy Me a Coffee: https://buymeacoffee.com/bitecode. Your support helps keep the system ad-free and free to use, and gives the community more available tokens.";
@@ -307,6 +316,7 @@ async function resolveMentorContext(lessonData, env) {
   const context = await env.DB.prepare(
     `SELECT u.firstname AS userfirstname, s.knowledgelevel, s.knowledgedomain, s.userpreferences,
             s.streakcount, s.unopenedcount, p.learning_goal AS userlearninggoal,
+            p.timezone AS usertimezone,
             c.name AS coursename, c.learninggoal AS coursegoal,
             l.lessonname, l.goal, l.contentdescription, l.codedescription, l.concepts, l.avoid,
             (SELECT COUNT(*) FROM lessons course_lessons WHERE course_lessons.courseid = c.id) AS totallessons,
@@ -363,6 +373,17 @@ async function resolveMentorContext(lessonData, env) {
       LIMIT 1`
   ).bind(userid, courseid).first();
 
+  const relConfig = relationshipConfig(env, context.usertimezone);
+  const currentPeriodKey = isoWeekKey(new Date(), relConfig.timezone);
+  const routingState = relConfig.enabled
+    ? await loadRelationshipRoutingState(env.DB, subscriptionid, currentPeriodKey)
+    : {};
+  const route = resolveConversationType(routingState, relConfig);
+  const definition = conversationDefinition(route.type, relConfig);
+  const relationshipContext = route.type === "NORMAL_LESSON"
+    ? "{}"
+    : await assembleRelationshipContext(env.DB, userid, subscriptionid);
+
   const recentSessions = history.results.map((row) => ({
     summary: bounded(row.analysis_summary || row.provider_summary, 1200),
     sentiment: bounded(row.sentiment_label, 32) || null,
@@ -396,6 +417,7 @@ async function resolveMentorContext(lessonData, env) {
     knowledgedomain: bounded(context.knowledgedomain, 500),
     userpreferences: bounded(context.userpreferences, 1000),
     userlearninggoal: bounded(context.userlearninggoal, 1000),
+    usertimezone: relConfig.timezone,
     coursegoal: bounded(context.coursegoal, 2000),
     courseprogress: JSON.stringify(courseProgress),
     lessongoal: bounded(context.goal, 2000),
@@ -407,6 +429,12 @@ async function resolveMentorContext(lessonData, env) {
     knowledgestrengths: JSON.stringify(uniqueSignals(history.results, "strengths_json")),
     knowledgegaps: JSON.stringify(uniqueSignals(history.results, "needs_practice_json")),
     practicerecommendations: JSON.stringify(nextSteps),
+    conversationtype: route.type,
+    relationshipperiodkey: route.periodKey || "",
+    relationshippromptversion: definition.promptVersion,
+    relationshipdefinition: JSON.stringify(definition),
+    relationshipcontext: relationshipContext,
+    relationshiproutingreason: route.reason,
     ...(previousEvaluation ? {
       previouslessonevaluation: {
         lessonId: String(previousEvaluation.lesson_id),
@@ -509,10 +537,25 @@ async function saveLessonEvaluation(input, lessonData, env) {
 
 async function createMentorSession(context, env) {
   const mentorSessionId = crypto.randomUUID();
-  await env.DB.prepare(
-    `INSERT INTO mentor_sessions (id, user_id, subscription_id, course_id, lesson_id, provider, status)
-     VALUES (?1, ?2, ?3, ?4, ?5, 'elevenlabs', 'active')`
-  ).bind(mentorSessionId, context.userid, context.subscriptionid, context.courseid, context.lessonid).run();
+  const supersede = env.DB.prepare(
+    `UPDATE mentor_sessions SET status='failed', failed_at=CURRENT_TIMESTAMP,
+       failure_reason='superseded_by_retry', updated_at=CURRENT_TIMESTAMP
+     WHERE subscription_id=?1 AND conversation_type=?2 AND status IN ('created','active')
+       AND ((period_key IS NULL AND ?3 IS NULL) OR period_key=?3)`
+  ).bind(context.subscriptionid, context.conversationtype || "NORMAL_LESSON", context.relationshipperiodkey || null);
+  const insert = env.DB.prepare(
+    `INSERT INTO mentor_sessions
+       (id, user_id, subscription_id, course_id, lesson_id, provider, status,
+        conversation_type, period_key, prompt_version, relationship_schema_version)
+     VALUES (?1, ?2, ?3, ?4, ?5, 'elevenlabs', 'active', ?6, ?7, ?8, ?9)`
+  ).bind(
+    mentorSessionId, context.userid, context.subscriptionid, context.courseid, context.lessonid,
+    context.conversationtype || "NORMAL_LESSON", context.relationshipperiodkey || null,
+    context.relationshippromptversion || "lesson-v1",
+    context.conversationtype === "NORMAL_LESSON" ? null : "2.0"
+  );
+  if (context.conversationtype === "NORMAL_LESSON") await insert.run();
+  else await env.DB.batch([supersede, insert]);
   return mentorSessionId;
 }
 

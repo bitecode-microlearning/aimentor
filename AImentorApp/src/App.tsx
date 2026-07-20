@@ -36,6 +36,11 @@ function App() {
     userlearninggoal?: string;
     coursegoal?: string;
     courseprogress?: string;
+    conversationtype?: string;
+    relationshipperiodkey?: string;
+    relationshippromptversion?: string;
+    relationshipdefinition?: string;
+    relationshipcontext?: string;
     mentorSessionId?: string;
     userId?: string;
     subscriptionId?: string;
@@ -123,6 +128,11 @@ function App() {
           userlearninggoal: json.userlearninggoal || "",
           coursegoal: json.coursegoal || "",
           courseprogress: json.courseprogress || "{}",
+          conversationtype: json.conversationtype || "NORMAL_LESSON",
+          relationshipperiodkey: json.relationshipperiodkey || "",
+          relationshippromptversion: json.relationshippromptversion || "lesson-v1",
+          relationshipdefinition: json.relationshipdefinition || "{}",
+          relationshipcontext: json.relationshipcontext || "{}",
           mentorSessionId: json.mentor_session_id || json.mentorSessionId,
           userId: String(json.userid || json.user_id || json.userId || ""),
           subscriptionId: String(json.subscriptionid || json.subscription_id || json.subscriptionId || ""),
@@ -235,6 +245,11 @@ function App() {
                   userlearninggoal={lessonData.userlearninggoal}
                   coursegoal={lessonData.coursegoal}
                   courseprogress={lessonData.courseprogress}
+                  conversationtype={lessonData.conversationtype}
+                  relationshipperiodkey={lessonData.relationshipperiodkey}
+                  relationshippromptversion={lessonData.relationshippromptversion}
+                  relationshipdefinition={lessonData.relationshipdefinition}
+                  relationshipcontext={lessonData.relationshipcontext}
                   mentorSessionId={lessonData.mentorSessionId}
                   userId={lessonData.userId}
                   subscriptionId={lessonData.subscriptionId}

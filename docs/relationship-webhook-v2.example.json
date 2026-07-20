@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "2.0",
+  "conversationType": "WEEKLY_CHECKPOINT",
+  "conversationId": "external-conversation-id",
+  "promptVersion": "relationship-v1",
+  "profileUpdates": {
+    "user": [
+      {
+        "field": "preferredExplanationStyle",
+        "value": "short practical examples before theory",
+        "confidence": 0.91,
+        "reason": "The learner explicitly requested examples before abstraction."
+      }
+    ],
+    "subscription": [
+      {
+        "field": "currentConfidence",
+        "value": 0.55,
+        "confidence": 0.86,
+        "reason": "The learner can follow examples but is unsure when applying the idea alone."
+      }
+    ]
+  },
+  "mentorSummary": {
+    "summary": "The learner is progressing but loses confidence during independent application.",
+    "importantContext": ["Practical examples increase confidence."],
+    "followUpTopics": ["Check confidence after one guided and one independent exercise."]
+  },
+  "checkpointSummary": {
+    "summary": "The learner is progressing but still loses confidence during independent application.",
+    "changesSincePrevious": [
+      "The guided example added after the previous checkpoint made the first attempt easier."
+    ],
+    "successes": [
+      "Completed an independent exercise after one guided example."
+    ],
+    "challenges": [
+      "Confidence still drops when no example is available."
+    ],
+    "agreedAdjustments": [
+      "Keep one guided example before the first independent exercise."
+    ],
+    "validationTopics": [
+      "Ask whether the learner can begin the next independent exercise with less prompting."
+    ]
+  },
+  "memory": [
+    {
+      "type": "CURRENT_BLOCKER",
+      "scope": "SUBSCRIPTION",
+      "summary": "The jump from a worked example to independent application feels too large.",
+      "importance": 85
+    }
+  ],
+  "feedback": [
+    {
+      "category": "AI_MENTOR",
+      "priority": "MEDIUM",
+      "feedbackText": "The mentor sometimes moves to the next explanation too quickly.",
+      "aiSummary": "Learner wants more reflection time before topic changes.",
+      "sentiment": "NEGATIVE",
+      "requiresFollowUp": false,
+      "confidence": 0.93
+    }
+  ]
+}

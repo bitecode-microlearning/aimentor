@@ -49,6 +49,11 @@ interface MentorPanelProps {
   userlearninggoal?: string;
   coursegoal?: string;
   courseprogress?: string;
+  conversationtype?: string;
+  relationshipperiodkey?: string;
+  relationshippromptversion?: string;
+  relationshipdefinition?: string;
+  relationshipcontext?: string;
   mentorSessionId?: string;
   userId?: string;
   subscriptionId?: string;
@@ -207,6 +212,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   userlearninggoal,
   coursegoal,
   courseprogress,
+  conversationtype,
+  relationshipperiodkey,
+  relationshippromptversion,
+  relationshipdefinition,
+  relationshipcontext,
   mentorSessionId,
   userId,
   subscriptionId,
@@ -829,6 +839,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             userlearninggoal: userlearninggoal || "",
             coursegoal: coursegoal || "",
             courseprogress: courseprogress || "{}",
+            conversation_type: conversationtype || "NORMAL_LESSON",
+            relationship_period_key: relationshipperiodkey || "",
+            relationship_prompt_version: relationshippromptversion || "lesson-v1",
+            relationship_definition: relationshipdefinition || "{}",
+            relationship_context: relationshipcontext || "{}",
             previous_lesson_evaluation: JSON.stringify(previousLessonEvaluation ?? null),
           }
         : {
