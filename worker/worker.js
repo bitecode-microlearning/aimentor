@@ -222,10 +222,21 @@ async function validateSignedLessonPayload(encoded, signature, env) {
     return { error: "Missing data or signature", status: 400 };
   }
 
-  const isValidSignature = await verifySignature(encoded, signature, env.HMAC_SECRET);
-  if (!isValidSignature) {
-    return { error: "Invalid signature", status: 403 };
+  const isValidSignature = env.HMAC_SECRET
+    ? await verifySignature(encoded, signature, env.HMAC_SECRET)
+    : false;
+  if (!isValidSignature && env.DEMO_ADMIN) {
+    const demoResponse = await env.DEMO_ADMIN.fetch("https://demo-admin.internal/internal/verify-launch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: encoded, sig: signature }),
+    });
+    if (demoResponse.ok) {
+      const demoResult = await demoResponse.json();
+      return { lessonData: demoResult.lessonData };
+    }
   }
+  if (!isValidSignature) return { error: "Invalid signature", status: 403 };
 
   const lessonData = await decodeLessonPayload(encoded);
   const now = Date.now() / 1000;
@@ -249,6 +260,17 @@ function getUsageExpiresAt(lessonData) {
   }
 
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isAiMentorDailyLimitEnabled(env) {
+  return String(env.AI_MENTOR_DAILY_LIMIT_ENABLED ?? "true").trim().toLowerCase() !== "false";
+}
+
+function isDemoLessonPayload(value) {
+  return value?.sessionmode === "demo" &&
+    typeof value?.demosessionid === "string" &&
+    value.demosessionid.startsWith("demo_") &&
+    value?.action === "open-demo-mentor-session";
 }
 
 function isIdOnlyLessonPayload(value) {
@@ -561,6 +583,7 @@ async function handleAIMentorUsage(action, lessonData, env) {
   }
 
   if (
+    isAiMentorDailyLimitEnabled(env) &&
     subscription.lastaimentorusage &&
     String(subscription.lastaimentorusage).slice(0, 10) === new Date().toISOString().slice(0, 10)
   ) {
@@ -655,7 +678,7 @@ export default {
       }
     }
 
-    if (pathname === "/agent" || pathname === "/usage" || pathname === "/evaluation") {
+    if (pathname === "/agent" || pathname === "/usage" || pathname === "/evaluation" || pathname === "/consent") {
       const requiredEnv = [
         "HMAC_SECRET",
         "DB",
@@ -676,7 +699,20 @@ export default {
           return jsonResponse({ error: result.error }, result.status, corsHeaders);
         }
 
+        const demoMode = isDemoLessonPayload(result.lessonData);
+
+        if (pathname === "/consent") {
+          if (!demoMode || !env.DEMO_ADMIN) return jsonResponse({ error: "Demo consent is unavailable." }, 400, corsHeaders);
+          const consentResponse = await env.DEMO_ADMIN.fetch("https://demo-admin.internal/api/tester-consent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data: encoded, sig: signature }),
+          });
+          return jsonResponse(await consentResponse.json(), consentResponse.status, corsHeaders);
+        }
+
         if (pathname === "/evaluation") {
+          if (demoMode) return jsonResponse({ success: true, demo: true }, 200, corsHeaders);
           if (!isIdOnlyLessonPayload(result.lessonData)) {
             return jsonResponse({ error: "Lesson evaluation requires an ID-only mentor link." }, 400, corsHeaders);
           }
@@ -685,7 +721,9 @@ export default {
         }
 
         const action = pathname === "/agent" ? "check_aimentor_usage" : "update_aimentor_usage";
-        const usageResult = await handleAIMentorUsage(action, result.lessonData, env);
+        const usageResult = demoMode
+          ? { ok: true, status: 200, body: { success: true, demo: true } }
+          : await handleAIMentorUsage(action, result.lessonData, env);
 
         if (!usageResult.ok) {
           if (usageResult.isLocalValidationError) {
@@ -720,7 +758,9 @@ export default {
 
         const resolvedContext = await resolveMentorContext(result.lessonData, env);
         const idOnlyBootstrap = isIdOnlyLessonPayload(result.lessonData);
-        const mentorSessionId = idOnlyBootstrap ? await createMentorSession(resolvedContext, env) : null;
+        const mentorSessionId = demoMode
+          ? result.lessonData.demosessionid
+          : idOnlyBootstrap ? await createMentorSession(resolvedContext, env) : null;
 
         let tokenAvailability;
 
@@ -772,7 +812,7 @@ export default {
         return jsonResponse(
           {
             ...withDebugPayload(data, env, tokenAvailability),
-            mentor_context_mode: idOnlyBootstrap ? "app_resolved" : "legacy_content",
+            mentor_context_mode: demoMode ? "demo" : idOnlyBootstrap ? "app_resolved" : "legacy_content",
             ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
           },
           res.status,

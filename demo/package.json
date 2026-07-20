@@ -1,0 +1,15 @@
+{
+  "name": "bitecode-ai-mentor-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "admin-link": "node scripts/generate-admin-link.mjs",
+    "test": "node --test",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.26.0"
+  }
+}

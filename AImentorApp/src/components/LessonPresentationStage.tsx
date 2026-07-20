@@ -1,8 +1,13 @@
 import React from "react";
-import { BookOpen, CheckCircle2, CircleAlert, CircleHelp, ClipboardCheck, Code2, Coffee, ListChecks, RefreshCw, Sparkles, XCircle } from "lucide-react";
+import { BookOpen, CheckCircle2, CircleHelp, ClipboardCheck, Code2, ListChecks, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import type { LessonEvaluation } from "../domain/lessonUnderstanding";
 import type { LessonPresentationSlide } from "../domain/lessonPresentation";
 import { LessonUnderstandingStatusCard } from "./LessonUnderstandingStatusCard";
+import coffeeCupBase from "../assets/mentor/coffee-cup-base.svg";
+import coffeeCupBody from "../assets/mentor/coffee-cup-body.svg";
+import coffeeCupHandle from "../assets/mentor/coffee-cup-handle.svg";
+import coffeeCupSteam from "../assets/mentor/coffee-cup-steam.svg";
+import coffeeSparkle from "../assets/mentor/coffee-sparkle.svg";
 
 interface LessonPresentationStageProps {
   lessonName: string;
@@ -112,32 +117,38 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
     const feedback = {
       correct: {
         label: "Correct",
-        description: "That answer captures the key idea.",
+        description: "That answer captures the key idea. Nice work—let’s build on it.",
         icon: CheckCircle2,
       },
       not_quite: {
-        label: "Not quite",
+        label: "Almost there",
         description: "You’re close, but one detail needs adjusting.",
-        icon: CircleAlert,
+        icon: XCircle,
       },
       wrong: {
-        label: "Wrong",
-        description: "That answer does not match the concept yet.",
+        label: "Not yet",
+        description: "That doesn't match the concept yet. Review the concept and try again.",
         icon: XCircle,
       },
     }[slide.result];
     const FeedbackIcon = feedback.icon;
+    const feedbackMessage = slide.message || (slide.result === "not_quite"
+      ? "You're on the right track but missed a key detail. Review the concept and try again."
+      : feedback.description);
     return (
       <section
+        key={slide.result}
         className={`lesson-stage lesson-stage-feedback lesson-stage-feedback-${slide.result}`}
         aria-live="polite"
         role="status"
         aria-label={`Answer feedback: ${feedback.label}`}
       >
-        <FeedbackIcon size={62} strokeWidth={2.2} aria-hidden="true" />
+        <span className="lesson-stage-feedback-icon" aria-hidden="true">
+          <FeedbackIcon size={34} strokeWidth={2.6} />
+        </span>
         <p className="lesson-stage-kicker">Answer feedback</p>
         <h3>{feedback.label}</h3>
-        <p>{slide.message || feedback.description}</p>
+        <p>{feedbackMessage}</p>
       </section>
     );
   }
@@ -155,12 +166,23 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
   if (slide.type === "donation") {
     return (
       <section className="lesson-stage lesson-stage-donation" aria-live="polite">
-        <div className="lesson-stage-donation-icon" aria-hidden="true"><Coffee size={38} /></div>
+        <div className="lesson-stage-coffee-visual" aria-hidden="true">
+          <span className="lesson-stage-coffee-cup">
+            <img className="lesson-stage-coffee-base" src={coffeeCupBase} alt="" />
+            <img className="lesson-stage-coffee-body" src={coffeeCupBody} alt="" />
+            <img className="lesson-stage-coffee-handle" src={coffeeCupHandle} alt="" />
+            <img className="lesson-stage-coffee-steam" src={coffeeCupSteam} alt="" />
+          </span>
+          <img className="lesson-stage-coffee-sparkle" src={coffeeSparkle} alt="" />
+        </div>
         <p className="lesson-stage-kicker">Help BiteCode stay independent</p>
-        <h3>Keep BiteCode ad-free</h3>
-        <p>If BiteCode helps you learn, you can support its running costs for about the price of a coffee.</p>
-        <a href={DONATION_URL} target="_blank" rel="noreferrer">Support BiteCode</a>
-        <span className="lesson-stage-url">buymeacoffee.com/bitecode</span>
+        <h3>Enjoying your AI Mentor session?</h3>
+        <p>A small coffee helps keep BiteCode independent, ad-free, and available for more learners.</p>
+        <a className="lesson-stage-coffee-button" href={DONATION_URL} target="_blank" rel="noreferrer">
+          <span>Buy me a coffee</span>
+          <span aria-hidden="true">→</span>
+          <span className="lesson-stage-coffee-shine" aria-hidden="true" />
+        </a>
       </section>
     );
   }

@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bitecode-ai-mentor-demo",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "AI_MENTOR_APP_URL": "https://aimentor-app.pages.dev",
+    "DEMO_ADMIN_URL_TTL_SECONDS": "900",
+    "DEMO_EMAIL_FROM": "bitecode@bitecode.co",
+    "DEMO_SESSION_TTL_SECONDS": "7776000",
+    "DEMO_URL_TTL_SECONDS": "7776000",
+    "DEMO_ADMIN_RESULT_URL_TTL_SECONDS": "86400",
+    "DEMO_URL_CLOCK_SKEW_SECONDS": "30",
+    "DEMO_URL_SINGLE_USE": "false"
+  },
+  "kv_namespaces": [
+    { "binding": "DEMO_SESSIONS", "id": "6f9eced73a854775b35d6d53fc6bbe72" }
+  ],
+  "send_email": [
+    { "name": "EMAIL" }
+  ]
+}

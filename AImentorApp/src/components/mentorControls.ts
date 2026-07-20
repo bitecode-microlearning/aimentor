@@ -31,6 +31,10 @@ export function isMentorAskingQuestion(message: string): boolean {
   return questionPhrases.some((phrase) => normalized.includes(phrase));
 }
 
+export function getHearingCheckRequest(): string {
+  return "Sorry, I didn't answer. Could you check whether I can hear you?";
+}
+
 export function debugMentorControls(message: string, data?: unknown) {
   if (!import.meta.env.DEV) return;
   console.debug(`[mentor-controls] ${message}`, data ?? "");

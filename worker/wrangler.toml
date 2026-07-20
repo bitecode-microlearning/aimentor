@@ -6,11 +6,16 @@ compatibility_date = "2025-10-19"
 # Minimum remaining ElevenLabs token/character budget required before creating a mentor session.
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
+AI_MENTOR_DAILY_LIMIT_ENABLED = "false"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "bitecode-sitedb-dev"
-database_id = "8c1c6e59-a9da-4e78-b283-c7856fffcc29"
+database_name = "bitecode-sitedb-prod"
+database_id = "0581ff0d-930a-42a6-b9c5-45b74a974a8d"
+
+[[services]]
+binding = "DEMO_ADMIN"
+service = "bitecode-ai-mentor-demo"
 
 [env.production]
 # Add production secrets in Cloudflare dashboard.
@@ -22,6 +27,11 @@ binding = "DB"
 database_name = "bitecode-sitedb-prod"
 database_id = "0581ff0d-930a-42a6-b9c5-45b74a974a8d"
 
+[[env.production.services]]
+binding = "DEMO_ADMIN"
+service = "bitecode-ai-mentor-demo"
+
 [env.production.vars]
 MIN_AVAILABLE_TOKENS = "2000"
 DEBUG_MODE = "0"
+AI_MENTOR_DAILY_LIMIT_ENABLED = "false"

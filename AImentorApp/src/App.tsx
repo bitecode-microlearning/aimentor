@@ -44,6 +44,7 @@ function App() {
     content?: string;
     signedData?: string;
     signedSig?: string;
+    sessionMode?: "demo" | "production";
     previousLessonEvaluation?: LessonEvaluation;
     sections: Array<{ title: string; content: string; type?: "text" | "code" | "tip" }>;
   }>({
@@ -58,6 +59,9 @@ function App() {
     ],
   });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [demoConsentAccepted, setDemoConsentAccepted] = useState(false);
+  const [demoConsentBusy, setDemoConsentBusy] = useState(false);
+  const [demoConsentError, setDemoConsentError] = useState<string | null>(null);
   const [visibleLessonEvaluation, setVisibleLessonEvaluation] = useState<{
     evaluation: LessonEvaluation;
     context: "previous" | "current";
@@ -127,6 +131,7 @@ function App() {
           content: json.content || "<p>No content available.</p>",
           signedData: data,
           signedSig: sig,
+          sessionMode: json.sessionmode === "demo" ? "demo" : "production",
           previousLessonEvaluation: parseLessonEvaluation(json.previouslessonevaluation) ?? undefined,
 
           sections: [
@@ -155,6 +160,24 @@ function App() {
     loadLesson();
   }, []);
 
+  const acceptDemoConsent = async () => {
+    if (!lessonData.signedData || !lessonData.signedSig) return;
+    setDemoConsentBusy(true);
+    setDemoConsentError(null);
+    try {
+      const cfg = await import("./config/workerConfig");
+      const consentUrl = cfg.WORKER_AGENT_URL?.replace(/\/agent\/?$/, "/consent");
+      if (!consentUrl) throw new Error("Demo consent service is unavailable.");
+      const response = await fetch(consentUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data: lessonData.signedData, sig: lessonData.signedSig }) });
+      if (!response.ok) throw new Error("The demo session could not be activated.");
+      setDemoConsentAccepted(true);
+    } catch (error) {
+      setDemoConsentError(error instanceof Error ? error.message : "The demo session could not be activated.");
+    } finally {
+      setDemoConsentBusy(false);
+    }
+  };
+
   return (
     // If there's a load error, show a minimal error message only
     loadError ? (
@@ -166,8 +189,30 @@ function App() {
       </div>
     ) : (
       <div className="mentor-app min-h-screen bg-[#F6F6F6] flex flex-col">
-        {/* Header */}
-        <Header courseName={lessonData.courseName} />
+        {lessonData.sessionMode === "demo" && !demoConsentAccepted && (
+          <div className="fixed inset-0 z-[100] bg-[#10251b]/80 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl rounded-3xl bg-white p-7 md:p-9 shadow-2xl">
+              <div className="text-xs font-bold uppercase tracking-[0.16em] text-[#23845a] mb-3">BiteCode AI Mentor demo</div>
+              <h2 className="text-3xl font-bold mb-4">You are opening AI Mentor in demo mode</h2>
+              <div className="space-y-3 text-[#52615a] leading-relaxed">
+                <p>This session uses a scenario prepared by the demo administrator.</p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>Your conversation and answers may be processed to evaluate the test.</li>
+                  <li>The configured administrator will receive the scenario parameters and session outcome.</li>
+                  <li>Demo session data will not be saved to the BiteCode learner database.</li>
+                  <li>This session is not connected to a BiteCode subscription and will not update learning progress or daily usage.</li>
+                  <li>Do not share sensitive, private, or confidential information.</li>
+                </ul>
+              </div>
+              {demoConsentError && <p className="mt-4 text-sm text-red-700">{demoConsentError}</p>}
+              <div className="mt-7 flex flex-wrap gap-3">
+                <button type="button" onClick={acceptDemoConsent} disabled={demoConsentBusy} className="rounded-xl bg-[#176f4a] px-5 py-3 font-semibold text-white disabled:opacity-60">{demoConsentBusy ? "Activating…" : "I understand and consent"}</button>
+                <button type="button" onClick={() => { window.location.href = "https://www.bitecode.co"; }} className="rounded-xl bg-[#e4f4e9] px-5 py-3 font-semibold text-[#17613f]">Leave demo</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {lessonData.sessionMode !== "demo" && <Header courseName={lessonData.courseName} />}
 
         {/* Main content */}
         <main className="mentor-app-main flex-1 w-full max-w-7xl mx-auto px-4 py-8">

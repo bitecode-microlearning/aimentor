@@ -19,8 +19,8 @@ describe("LessonPresentationStage", () => {
 
   it.each([
     ["correct", "Correct", "lesson-stage-feedback-correct"],
-    ["not_quite", "Not quite", "lesson-stage-feedback-not_quite"],
-    ["wrong", "Wrong", "lesson-stage-feedback-wrong"],
+    ["not_quite", "Almost there", "lesson-stage-feedback-not_quite"],
+    ["wrong", "Not yet", "lesson-stage-feedback-wrong"],
   ] as const)("renders %s answer feedback with its distinct card state", (result, label, className) => {
     const { container } = render(<LessonPresentationStage
       lessonName="State"
@@ -48,7 +48,7 @@ describe("LessonPresentationStage", () => {
 
   it("uses the fixed BiteCode support URL", () => {
     render(<LessonPresentationStage lessonName="State" slide={{ type: "donation" }} />);
-    expect(screen.getByRole("link", { name: "Support BiteCode" }).getAttribute("href")).toBe("https://buymeacoffee.com/bitecode");
+    expect(screen.getByRole("link", { name: /Buy me a coffee/ }).getAttribute("href")).toBe("https://buymeacoffee.com/bitecode");
   });
 
   it("combines the final summary with the lesson outcome", () => {

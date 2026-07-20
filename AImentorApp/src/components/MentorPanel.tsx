@@ -4,6 +4,7 @@ import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
   debugMentorControls,
+  getHearingCheckRequest,
   getReadableError,
   type MentorControlState,
 } from "./mentorControls";
@@ -86,7 +87,15 @@ type TokenAvailabilityDebug = {
 const ESTIMATED_SESSION_SECONDS = 480;
 const USAGE_REGISTRATION_DELAY_MS = 60 * 1000;
 const USAGE_REGISTRATION_RETRY_DELAYS_MS = [10 * 1000, 30 * 1000, 60 * 1000];
+const INITIAL_LEARNER_RESPONSE_WAIT_MS = 6000;
+const HEARING_CHECK_RESPONSE_WAIT_MS = 4000;
+const HEARING_CHECK_FALLBACK_WAIT_MS = 2500;
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
+const FEMALE_ENGLISH_VOICE_NAMES = [
+  "female", "zira", "aria", "jenny", "samantha", "victoria", "karen", "moira",
+  "tessa", "ava", "susan", "hazel", "heera", "sonia", "libby", "natasha", "ana",
+  "google us english", "google uk english female",
+];
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
 )
@@ -94,6 +103,16 @@ const mentorVideos = Object.entries(
   .map(([, videoUrl]) => videoUrl as string);
 
 const pickRandomMentorVideo = () => mentorVideos[Math.floor(Math.random() * mentorVideos.length)];
+
+const pickFemaleEnglishSpeechVoice = (voices: SpeechSynthesisVoice[]) => {
+  const englishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+  return englishVoices.find((voice) => {
+    const normalizedName = voice.name.toLowerCase();
+    return FEMALE_ENGLISH_VOICE_NAMES.some((candidate) =>
+      new RegExp(`(^|[^a-z])${candidate.replace(/ /g, "[ -]")}([^a-z]|$)`).test(normalizedName),
+    );
+  });
+};
 
 const formatTokenCount = (value: unknown) => {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -110,9 +129,6 @@ const formatElapsedTime = (elapsedSeconds: number) => {
 
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
-
-const isOpeningReadinessQuestion = (message: string) =>
-  /\b(?:are you ready|ready to (?:begin|start|continue)|shall we (?:begin|start))\b/i.test(message);
 
 type AnswerFeedbackResult = "correct" | "not_quite" | "wrong";
 
@@ -240,7 +256,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const pendingKnowledgeCheckPhaseRef = useRef<LessonPhase | null>(null);
   const lastDisplayedTopicTitleRef = useRef("");
   const learnerAnswerExpectedRef = useRef(false);
-  const automaticContinuationInFlightRef = useRef(false);
+  const learnerResponseTimerRef = useRef<number | null>(null);
+  const hearingCheckIssuedRef = useRef(false);
+  const hearingCheckSpokenRef = useRef(false);
+  const hearingCheckUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
   const isSessionActive =
@@ -296,6 +315,23 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  const clearLearnerResponseTimer = () => {
+    if (learnerResponseTimerRef.current !== null) {
+      window.clearTimeout(learnerResponseTimerRef.current);
+      learnerResponseTimerRef.current = null;
+    }
+  };
+
+  const resetSilenceRecovery = () => {
+    clearLearnerResponseTimer();
+    hearingCheckIssuedRef.current = false;
+    hearingCheckSpokenRef.current = false;
+    if (hearingCheckUtteranceRef.current && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      hearingCheckUtteranceRef.current = null;
+    }
+  };
+
   const setMicrophoneMuted = (muted: boolean) => {
     clearPendingUnmute();
     setIsMicMuted(muted);
@@ -341,7 +377,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     pendingKnowledgeCheckPhaseRef.current = null;
     lastDisplayedTopicTitleRef.current = "";
     learnerAnswerExpectedRef.current = false;
-    automaticContinuationInFlightRef.current = false;
+    resetSilenceRecovery();
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
     clearProgressTimer();
@@ -379,6 +415,98 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
   };
 
+  const abortUnresponsiveSession = () => {
+    const conversation = conversationRef.current;
+    resetSilenceRecovery();
+    userRequestedEndRef.current = true;
+    setMicrophoneMuted(true);
+
+    Promise.resolve(conversation?.endSession?.()).catch((error) => {
+      debugMentorControls("failed to end unresponsive session", error);
+    }).finally(() => {
+      resetSessionState("disconnected");
+      setErrorMessage("The session ended because no learner response was detected.");
+    });
+  };
+
+  const startFinalResponseWindow = () => {
+    if (!conversationRef.current || !hearingCheckIssuedRef.current) return;
+
+    clearLearnerResponseTimer();
+    hearingCheckSpokenRef.current = true;
+    hearingCheckUtteranceRef.current = null;
+    userManuallyMutedRef.current = false;
+    setUserManuallyMuted(false);
+    setControlState("mentor_waiting_for_answer");
+    learnerResponseTimerRef.current = window.setTimeout(
+      abortUnresponsiveSession,
+      HEARING_CHECK_RESPONSE_WAIT_MS,
+    );
+  };
+
+  const speakHearingCheckLocally = () => {
+    if (!conversationRef.current || !hearingCheckIssuedRef.current || hearingCheckSpokenRef.current) return;
+
+    hearingCheckSpokenRef.current = true;
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    debugMentorControls("using local hearing check fallback");
+
+    if (!("speechSynthesis" in window) || typeof window.SpeechSynthesisUtterance === "undefined") {
+      startFinalResponseWindow();
+      return;
+    }
+
+    const utterance = new window.SpeechSynthesisUtterance("Can you hear me?");
+    const femaleVoice = pickFemaleEnglishSpeechVoice(window.speechSynthesis.getVoices());
+    if (femaleVoice) {
+      utterance.voice = femaleVoice;
+      utterance.lang = femaleVoice.lang;
+    } else {
+      utterance.lang = "en-US";
+    }
+    utterance.rate = 0.95;
+    utterance.pitch = 1.08;
+    hearingCheckUtteranceRef.current = utterance;
+    utterance.onend = startFinalResponseWindow;
+    utterance.onerror = startFinalResponseWindow;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const requestHearingCheck = () => {
+    const conversation = conversationRef.current;
+    if (!conversation) return;
+
+    clearLearnerResponseTimer();
+    hearingCheckIssuedRef.current = true;
+    hearingCheckSpokenRef.current = false;
+    setMicrophoneMuted(true);
+    setControlState("mentor_speaking");
+    const request = getHearingCheckRequest();
+    debugMentorControls("requesting learner hearing check");
+
+    try {
+      if (conversation.sendUserMessage) {
+        Promise.resolve(conversation.sendUserMessage(request)).catch((error) => {
+          debugMentorControls("hearing check failed", error);
+        });
+      } else if (conversation.sendContextualUpdate) {
+        Promise.resolve(conversation.sendContextualUpdate(request)).catch((error) => {
+          debugMentorControls("hearing check failed", error);
+        });
+      } else {
+        debugMentorControls("conversation cannot request an agent hearing check");
+      }
+    } catch (error) {
+      debugMentorControls("hearing check failed", error);
+    }
+
+    learnerResponseTimerRef.current = window.setTimeout(
+      speakHearingCheckLocally,
+      HEARING_CHECK_FALLBACK_WAIT_MS,
+    );
+  };
+
   const extractMessageText = (message: any) => {
     return String(message?.message ?? message?.text ?? message?.transcript ?? "");
   };
@@ -394,6 +522,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     if (!text) return;
 
     if (source === "user") {
+      if (text.trim() === getHearingCheckRequest()) return;
+      resetSilenceRecovery();
       if (stateRef.current === "mentor_waiting_for_answer" || stateRef.current === "user_question_mode") {
         setControlState("user_speaking");
       }
@@ -423,7 +553,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     debugMentorControls("mode event", modeEvent);
 
     if (nextMode === "speaking") {
-      automaticContinuationInFlightRef.current = false;
+      clearLearnerResponseTimer();
+      if (hearingCheckIssuedRef.current) {
+        hearingCheckSpokenRef.current = true;
+      }
       switchToMentorSpeaking();
       return;
     }
@@ -445,26 +578,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         return;
       }
 
-      if (stateRef.current === "user_question_mode" || stateRef.current === "user_speaking") return;
-
-      const openingReadinessExpected = isOpeningReadinessQuestion(lastMentorMessageRef.current);
-      if (!learnerAnswerExpectedRef.current && !openingReadinessExpected) {
+      if (hearingCheckIssuedRef.current && !hearingCheckSpokenRef.current) {
         setMicrophoneMuted(true);
         setControlState("mentor_speaking");
-        if (!automaticContinuationInFlightRef.current) {
-          automaticContinuationInFlightRef.current = true;
-          const continuation = conversationRef.current?.sendContextualUpdate?.(
-            "BiteCode lesson state: no learner answer is expected at this transition. Continue the planned lesson flow.",
-          );
-          if (continuation && typeof (continuation as Promise<void>).catch === "function") {
-            (continuation as Promise<void>).catch((error) => {
-              automaticContinuationInFlightRef.current = false;
-              debugMentorControls("automatic continuation failed", error);
-              setErrorMessage("The mentor paused unexpectedly. Please use the microphone control to continue.");
-              setControlState("mentor_waiting_for_answer");
-            });
-          }
-        }
         return;
       }
 
@@ -472,6 +588,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       userManuallyMutedRef.current = false;
       setUserManuallyMuted(false);
       setControlState("mentor_waiting_for_answer");
+
+      clearLearnerResponseTimer();
+      learnerResponseTimerRef.current = window.setTimeout(
+        hearingCheckIssuedRef.current ? abortUnresponsiveSession : requestHearingCheck,
+        hearingCheckIssuedRef.current ? HEARING_CHECK_RESPONSE_WAIT_MS : INITIAL_LEARNER_RESPONSE_WAIT_MS,
+      );
       return;
     }
 
@@ -512,6 +634,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       clearPendingUnmute();
       clearProgressTimer();
       clearUsageRegistrationTimer();
+      clearLearnerResponseTimer();
       conversationRef.current?.endSession?.();
       conversationRef.current = null;
     };
@@ -610,7 +733,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     closingEvaluationCompletedRef.current = false;
     closingFarewellDetectedRef.current = false;
     learnerAnswerExpectedRef.current = false;
-    automaticContinuationInFlightRef.current = false;
+    resetSilenceRecovery();
     presentationFinalizedRef.current = false;
     onLessonPresentationChange?.(null);
     setErrorMessage(null);
@@ -714,7 +837,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             lessonname: lessonname || "Untitled Lesson",
             knowledgelevel: knowledgelevel || "beginner",
             content: content || "",
-            ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
+            ...(activeMentorSessionId ? { mentor_session_id: activeMentorSessionId } : {}),
           };
 
       const convo = await Conversation.startSession({
