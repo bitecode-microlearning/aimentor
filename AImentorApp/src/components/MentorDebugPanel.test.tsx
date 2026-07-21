@@ -57,6 +57,9 @@ describe("MentorDebugPanel", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
     const copiedLog = writeText.mock.calls[0][0];
     expect(copiedLog).toContain("BiteCode AI Mentor debug log");
+    expect(copiedLog).toContain("Version:");
+    expect(copiedLog).toContain("Build number:");
+    expect(copiedLog).toContain("Build date:");
     expect(copiedLog).toContain("[12:34:56] [PARAMETERS] dynamic variables prepared");
     expect(copiedLog).toContain("COURSE_CALIBRATION");
     expect(formatMentorDebugLog(debugEvents)).toContain("Events: 1");

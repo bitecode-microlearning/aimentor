@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCurrentSessionGeneration, isDisplayedQuestionSpoken, isMentorQuestionLeadIn, isRecoverableClientToolError, remainingMinimumDisplayMs, shouldAutoContinueMentorTurn } from "./mentorControls";
+import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCodeDependentKnowledgeCheck, isCurrentSessionGeneration, isDisplayedQuestionSpoken, isMentorQuestionLeadIn, isRecoverableClientToolError, remainingMinimumDisplayMs, shouldAutoContinueMentorTurn } from "./mentorControls";
+
+describe("isCodeDependentKnowledgeCheck", () => {
+  it("rejects questions that require the learner to recall a hidden code card", () => {
+    expect(isCodeDependentKnowledgeCheck("In the displayed function, what is the explicit output?")).toBe(true);
+    expect(isCodeDependentKnowledgeCheck("In the event processor example, why is the counters object a side effect?")).toBe(true);
+    expect(isCodeDependentKnowledgeCheck("What invariant should stay true for every record processed by this function?")).toBe(true);
+    expect(isCodeDependentKnowledgeCheck("Explain a safe bug-fix path for the example code.")).toBe(true);
+  });
+
+  it("allows standalone conceptual questions", () => {
+    expect(isCodeDependentKnowledgeCheck("Why should side effects be identified before changing production code?")).toBe(false);
+    expect(isCodeDependentKnowledgeCheck("What is an invariant?")).toBe(false);
+  });
+});
 
 describe("remainingMinimumDisplayMs", () => {
   it("holds a newly displayed card for the configured minimum", () => {
@@ -15,7 +29,6 @@ describe("remainingMinimumDisplayMs", () => {
 describe("getHearingCheckRequest", () => {
   it("uses a learner-style hearing-check request without control instructions", () => {
     const message = getHearingCheckRequest();
-
     expect(message).toBe("Sorry, I didn't answer. Could you check whether I can hear you?");
     expect(message).not.toMatch(/[\[\]]|automatic|instruction|learner answer/i);
   });
@@ -58,12 +71,12 @@ describe("shouldAutoContinueMentorTurn", () => {
 
 describe("isMentorQuestionLeadIn", () => {
   it("recognizes a question cue before its client tool runs", () => {
-    expect(isMentorQuestionLeadIn("Okay, here’s a question.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Okay, here's a question.")).toBe(true);
     expect(isMentorQuestionLeadIn("Correct. Here's the next check.")).toBe(true);
     expect(isMentorQuestionLeadIn("Showing the next check.")).toBe(true);
-    expect(isMentorQuestionLeadIn("Let’s try a quick check.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Let's try a quick check.")).toBe(true);
     expect(isMentorQuestionLeadIn("Try this one.")).toBe(true);
-    expect(isMentorQuestionLeadIn("Let’s test that idea.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Let's test that idea.")).toBe(true);
   });
 
   it("does not classify an ordinary transition as a question cue", () => {
@@ -76,10 +89,7 @@ describe("isDisplayedQuestionSpoken", () => {
     const question = "A dictionary can map a key to a function.";
     expect(isDisplayedQuestionSpoken("Think this through.", question)).toBe(false);
     expect(isDisplayedQuestionSpoken("A dictionary can map a key to a function", question)).toBe(true);
-    expect(isDisplayedQuestionSpoken(
-      "Correct. Keep that in mind. A dictionary can map a key to a function.",
-      question,
-    )).toBe(true);
+    expect(isDisplayedQuestionSpoken("Correct. Keep that in mind. A dictionary can map a key to a function.", question)).toBe(true);
   });
 });
 

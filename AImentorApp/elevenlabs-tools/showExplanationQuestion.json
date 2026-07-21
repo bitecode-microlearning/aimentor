@@ -1,11 +1,11 @@
 {
   "type": "client",
   "name": "showExplanationQuestion",
-  "description": "Display one open explanation, reasoning, or calibration question. First speak one short varied cue, such as Here's a question to think through, Think this through, or Let's try a quick check. Do not repeat the same cue throughout the session. Only after the cue has been spoken, call this tool, then immediately speak the supplied question with no intervening words.",
+  "description": "Display one standalone conceptual explanation, reasoning, or calibration question. It must be understandable without any code/example card and must not name or point to a concrete example, function, identifier, object, field, output, mutation, invariant, or assumption from it. Reject wording such as this function, the example, or a named example such as the event processor example; rewrite it as a transferable principle before calling this tool. Then speak the supplied question exactly.",
   "expects_response": true,
   "response_timeout_secs": 30,
   "parameters": [
-    { "id": "question", "type": "string", "description": "Only the exact open question that will be spoken next. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+    { "id": "question", "type": "string", "description": "Only an exact standalone conceptual question answerable without seeing or remembering a concrete example. No example references, identifiers, implementation details, lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

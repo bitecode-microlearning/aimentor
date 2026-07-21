@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
+declare const __APP_BUILD_INFO__: {
+  version: string;
+  buildNumber: string;
+  buildDate: string;
+  commit: string;
+};
+
 export type MentorDebugEvent = {
   id: number;
   timestamp: string;
@@ -22,9 +29,22 @@ const formatDebugData = (data: unknown) => {
   }
 };
 
-export const formatMentorDebugLog = (events: MentorDebugEvent[]) => [
+const getBuildInfo = () => typeof __APP_BUILD_INFO__ !== "undefined" ? __APP_BUILD_INFO__ : {
+  version: "unavailable",
+  buildNumber: "unavailable",
+  buildDate: "unavailable",
+  commit: "unavailable",
+};
+
+export const formatMentorDebugLog = (events: MentorDebugEvent[]) => {
+  const buildInfo = getBuildInfo();
+  return [
   "BiteCode AI Mentor debug log",
   `Copied: ${new Date().toISOString()}`,
+  `Version: ${buildInfo.version}`,
+  `Build number: ${buildInfo.buildNumber}`,
+  `Build date: ${buildInfo.buildDate}`,
+  `Commit: ${buildInfo.commit}`,
   `Events: ${events.length}`,
   "",
   ...events.flatMap((event) => [
@@ -32,7 +52,8 @@ export const formatMentorDebugLog = (events: MentorDebugEvent[]) => [
     ...(event.data === undefined ? [] : [formatDebugData(event.data)]),
     "",
   ]),
-].join("\n").trimEnd();
+  ].join("\n").trimEnd();
+};
 
 const copyText = async (value: string) => {
   if (navigator.clipboard?.writeText) {

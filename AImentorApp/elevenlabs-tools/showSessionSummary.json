@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "showSessionSummary",
-  "description": "Prepare the final learner-facing session summary slide only after reportLessonEvaluation has succeeded. Call once using only topics genuinely covered in the current call. The client holds this slide until the call has ended.",
+  "description": "Display the learner-facing lesson result summary only after reportLessonEvaluation has succeeded and before showDonationSlide. Call once using only topics genuinely covered in the current call. The client keeps this summary for the final result after the call ends.",
   "expects_response": true,
   "response_timeout_secs": 5,
   "parameters": [

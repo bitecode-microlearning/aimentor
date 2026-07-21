@@ -1,7 +1,7 @@
 {
   "type": "client",
   "name": "showDonationSlide",
-  "description": "Show BiteCode's fixed ad-free support slide exactly once during every completed normal lesson. Call it in the final closing sequence before speaking the configured support message and before the goodbye. Never use it during relationship coaching. The client owns the trusted donation text and URL.",
+  "description": "Show BiteCode's fixed ad-free support slide exactly once during every completed normal lesson, but only after reportLessonEvaluation and showSessionSummary have succeeded and the complete lesson result has been visible first. After this tool succeeds, do not call End immediately: first speak the configured support message, then speak one short warm farewell as a separate final sentence. Call End only after the farewell is fully spoken. Never use this tool during relationship coaching.",
   "expects_response": true,
   "response_timeout_secs": 30,
   "parameters": [],

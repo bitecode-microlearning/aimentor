@@ -15,6 +15,7 @@ import {
   getHearingCheckRequest,
   getReadableError,
   isClosingFarewellMessage,
+  isCodeDependentKnowledgeCheck,
   isCurrentSessionGeneration,
   isDisplayedQuestionSpoken,
   isMentorQuestionLeadIn,
@@ -115,6 +116,7 @@ const LEARNER_VOICE_ACTIVITY_SAMPLES = 2;
 const STARTUP_CONTINUATION_REQUEST = "Hello.";
 const TURN_CONTINUATION_REQUEST = "Please continue.";
 const MINIMUM_CODE_CARD_DISPLAY_MS = 10_000;
+const MINIMUM_LESSON_RESULT_DISPLAY_MS = 10_000;
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
@@ -293,6 +295,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const closingSummaryCompletedRef = useRef(false);
   const closingEvaluationCompletedRef = useRef(false);
   const closingFarewellDetectedRef = useRef(false);
+  const lessonResultDisplayedAtRef = useRef<number | null>(null);
   const unmuteTimerRef = useRef<number | null>(null);
   const progressTimerRef = useRef<number | null>(null);
   const usageRegistrationTimerRef = useRef<number | null>(null);
@@ -961,6 +964,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     closingSummaryCompletedRef.current = false;
     closingEvaluationCompletedRef.current = false;
     closingFarewellDetectedRef.current = false;
+    lessonResultDisplayedAtRef.current = null;
     learnerAnswerExpectedRef.current = false;
     questionToolPendingRef.current = false;
     pendingSpokenQuestionRef.current = "";
@@ -1329,6 +1333,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Mentor question text is required.");
+            if (isCodeDependentKnowledgeCheck(question)) {
+              appendDebugEvent("question", "code-dependent knowledge check rejected", { question });
+              return "Do not speak or display that question. Rephrase it as a standalone conceptual question that can be answered without seeing or remembering the code example, then call the question tool again.";
+            }
             await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
@@ -1348,6 +1356,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizeTrueFalseQuestion(payload?.question);
             if (!question) throw new Error("True-or-false question text is required.");
+            if (isCodeDependentKnowledgeCheck(question)) {
+              appendDebugEvent("question", "code-dependent knowledge check rejected", { question });
+              return "Do not speak or display that question. Rephrase it as a standalone conceptual question that can be answered without seeing or remembering the code example, then call the question tool again.";
+            }
             await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
@@ -1363,6 +1375,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showExplanationQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Explanation question text is required.");
+            if (isCodeDependentKnowledgeCheck(question)) {
+              appendDebugEvent("question", "code-dependent knowledge check rejected", { question });
+              return "Do not speak or display that question. Rephrase it as a standalone conceptual question that can be answered without seeing or remembering the code example, then call the question tool again.";
+            }
             await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
@@ -1419,9 +1435,24 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             return "Displayed the exact code or data example in the lesson presentation area.";
           },
           showDonationSlide: async () => {
+            if (!closingEvaluationCompletedRef.current) {
+              return "Do not show or mention the donation slide yet. First call reportLessonEvaluation with the actual knowledge-check results.";
+            }
+            if (!closingSummaryCompletedRef.current) {
+              return "Do not show or mention the donation slide yet. First call showSessionSummary so the lesson result is prepared and visible.";
+            }
+            const resultHoldMs = remainingMinimumDisplayMs(
+              lessonResultDisplayedAtRef.current,
+              Date.now(),
+              MINIMUM_LESSON_RESULT_DISPLAY_MS,
+            );
+            if (resultHoldMs > 0) {
+              appendDebugEvent("presentation", "holding lesson result before donation slide", { remainingMs: resultHoldMs });
+              await new Promise<void>((resolve) => window.setTimeout(resolve, resultHoldMs));
+            }
             await releaseCodeCard();
             onLessonPresentationChange?.({ type: "donation" });
-            return "Displayed the BiteCode ad-free support slide. Continue the conversation naturally.";
+            return "The donation slide is now visible. Do not call End yet. First speak the configured brief BiteCode support message, then speak one short warm farewell as a separate final sentence. Only after the farewell has been fully spoken may you call End.";
           },
           showSessionSummary: async (payload: SummarySlideInput) => {
             if (!closingEvaluationCompletedRef.current) {
@@ -1439,7 +1470,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               encouragement,
             };
             closingSummaryCompletedRef.current = true;
-            return "Prepared the closing lesson summary. It will be displayed after the call ends.";
+            onLessonPresentationChange?.(pendingSummarySlideRef.current);
+            lessonResultDisplayedAtRef.current = Date.now();
+            return "Displayed the closing lesson summary and grade. Continue with the donation slide only after the learner has had time to see this result.";
           },
           showPreviousLessonEvaluation: async () => {
             if (!previousLessonEvaluation) {
@@ -1464,13 +1497,14 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               explicitConfusionDetected: Boolean(payload.explicitConfusionDetected),
             });
             pendingCurrentEvaluationRef.current = evaluation;
+            onLessonEvaluationVisible?.(evaluation, "current");
             try {
               await persistLessonEvaluation(evaluation);
             } catch (error) {
               debugMentorControls("lesson evaluation persistence failed", getReadableError(error));
             }
             closingEvaluationCompletedRef.current = true;
-            return `Processed the lesson outcome: ${evaluation.status}. The donation card, support message, and spoken farewell must already be complete. Do not speak again, add teaching, ask a question, or repeat the goodbye. End the session now; the result will appear after the call ends.`;
+            return `Processed the lesson outcome: ${evaluation.status}. Now call showSessionSummary to display the complete grade and takeaway card. Do not show donation or end the session yet.`;
           },
         }, appendDebugEvent),
       });

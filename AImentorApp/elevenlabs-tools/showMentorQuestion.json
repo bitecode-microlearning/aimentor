@@ -1,11 +1,11 @@
 {
   "type": "client",
   "name": "showMentorQuestion",
-  "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, first speak one short varied question cue, then call this tool and immediately speak the exact question with no intervening words.",
+  "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, the question must be a standalone transferable concept answerable without seeing or remembering a concrete code example. Never name or point to the example or its implementation details.",
   "expects_response": true,
   "response_timeout_secs": 30,
   "parameters": [
-    { "id": "question", "type": "string", "description": "Only the exact learner-facing question that will be spoken next. Do not add setup, a hint, or an answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
+    { "id": "question", "type": "string", "description": "Only the exact standalone conceptual question. No concrete-example references, identifiers, implementation details, setup, hint, or answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

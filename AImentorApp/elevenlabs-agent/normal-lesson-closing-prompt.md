@@ -11,12 +11,12 @@ Complete these actions in exactly this order:
 1. Call `showLessonPhase` with `session_wrap_up`.
 2. Briefly summarize the main lesson takeaway in one sentence.
 3. When supported by the conversation, acknowledge one specific thing the learner handled well.
-4. Call `showDonationSlide` exactly once.
-5. After the donation card is visible, speak the support message.
-6. Speak one short, warm farewell as a standalone final sentence.
-7. Only after the farewell has been fully spoken, silently call `reportLessonEvaluation` using the actual question outcomes from this lesson.
-8. After the evaluation succeeds, silently call `showSessionSummary`.
-9. Only after both tools succeed, transition to `End` without speaking again.
+4. Call `reportLessonEvaluation` using the actual question outcomes from this lesson. This displays the grade card immediately.
+5. Call `showSessionSummary` with the takeaway while the grade card remains visible.
+6. Call `showDonationSlide` exactly once only after both result tools succeed.
+7. After the donation card is visible, speak the support message.
+8. Speak one short, warm farewell as a standalone final sentence.
+9. Transition to `End` without speaking again.
 
 Never skip, reorder, or combine these steps. Calling `showLessonPhase("session_wrap_up")` authorizes this closing workflow to begin; it does not authorize the session to end.
 
@@ -36,11 +36,11 @@ The final spoken sentence must be a clear declarative goodbye. Do not ask the le
 
 ## Summary and evaluation
 
-After the farewell is fully spoken:
+Before showing the donation slide:
 
-- Call `reportLessonEvaluation` silently with accurate totals for the current lesson. Include skipped answers, detected uncertainty, and explicit confusion only when they actually occurred.
-- Only after the evaluation succeeds, call `showSessionSummary` silently with only topics genuinely covered in this call.
-- Do not speak after either tool call.
+- Call `reportLessonEvaluation` with accurate totals for the current lesson. Include skipped answers, detected uncertainty, and explicit confusion only when they actually occurred.
+- Only after the evaluation succeeds, call `showSessionSummary` with only topics genuinely covered in this call.
+- Let the learner see the result while completing the concise takeaway, then call `showDonationSlide`.
 
 If either tool fails, do not claim it succeeded and do not immediately end. Retry a recoverable tool failure once. If it still fails, follow the configured safe error route rather than the successful `End` route.
 
@@ -49,11 +49,12 @@ If either tool fails, do not claim it succeeded and do not immediately end. Retr
 The successful route from this node to `End` is valid only after all of the following are true:
 
 - the session-wrap-up phase was displayed;
+- `reportLessonEvaluation` succeeded.
+- `showSessionSummary` succeeded;
+- the lesson result was displayed before the donation slide;
 - the donation slide was displayed;
 - the support message was spoken;
 - the farewell was fully spoken;
-- `reportLessonEvaluation` succeeded.
-- `showSessionSummary` succeeded;
 
 There must be no direct `Explain the lesson -> End` route. The only successful normal-lesson path to `End` is:
 

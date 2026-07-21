@@ -41,6 +41,15 @@ export function remainingMinimumDisplayMs(displayedAt: number | null, now: numbe
   return Math.max(0, minimumMs - Math.max(0, now - displayedAt));
 }
 
+export function isCodeDependentKnowledgeCheck(question: string): boolean {
+  const normalized = question.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!normalized) return false;
+
+  return /\b(?:this|the|displayed|shown|above|example)\s+(?:code|function|method|snippet|record|processor|example)\b/.test(normalized)
+    || /\b(?:in|from|for)\s+(?:this|the|displayed|shown|above)\s+(?:code|function|method|snippet|record|processor|example)\b/.test(normalized)
+    || /\b(?:in|from|based on)\s+(?:the\s+)?(?:[a-z0-9_-]+\s+){1,4}example\b/.test(normalized);
+}
+
 export function isMentorQuestionLeadIn(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/[’]/g, "'");
   if (!normalized) return false;
