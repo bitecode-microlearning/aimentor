@@ -55,6 +55,7 @@ const copyText = async (value: string) => {
 export function MentorDebugPanel({ events }: MentorDebugPanelProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
   const resetCopyStateTimerRef = useRef<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
   useEffect(() => {
@@ -83,12 +84,43 @@ export function MentorDebugPanel({ events }: MentorDebugPanelProps) {
     resetCopyStateTimerRef.current = window.setTimeout(() => setCopyState("idle"), 2500);
   };
 
+  const handleDownloadLog = () => {
+    const blob = new Blob([formatMentorDebugLog(events)], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    link.href = url;
+    link.download = `bitecode-ai-mentor-debug-${timestamp}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="mentor-debug-panel" aria-label="AI Mentor debug information">
       <div className="mentor-debug-header">
-        <span>AI Mentor debug</span>
+        <button
+          type="button"
+          className="mentor-debug-toggle"
+          aria-expanded={isExpanded}
+          aria-controls="mentor-debug-stream"
+          onClick={() => setIsExpanded((expanded) => !expanded)}
+        >
+          <span className="mentor-debug-chevron" aria-hidden="true">{isExpanded ? "▼" : "▶"}</span>
+          <span>AI Mentor debug</span>
+          <span className="mentor-debug-event-count">{events.length}</span>
+        </button>
         <div className="mentor-debug-actions">
           <span className="mentor-debug-live">LIVE</span>
+          <button
+            type="button"
+            className="mentor-debug-copy"
+            onClick={handleDownloadLog}
+            disabled={events.length === 0}
+          >
+            Download log
+          </button>
           <button
             type="button"
             className={`mentor-debug-copy mentor-debug-copy-${copyState}`}
@@ -99,7 +131,13 @@ export function MentorDebugPanel({ events }: MentorDebugPanelProps) {
           </button>
         </div>
       </div>
-      <div className="mentor-debug-stream" role="log" aria-live="polite">
+      <div
+        id="mentor-debug-stream"
+        className="mentor-debug-stream"
+        role="log"
+        aria-live="polite"
+        hidden={!isExpanded}
+      >
         {events.length === 0 ? (
           <div className="mentor-debug-empty">Waiting for session events…</div>
         ) : events.map((event) => (

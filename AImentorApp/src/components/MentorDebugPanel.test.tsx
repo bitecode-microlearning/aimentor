@@ -17,10 +17,34 @@ describe("MentorDebugPanel", () => {
   it("renders structured session events", () => {
     render(<MentorDebugPanel events={debugEvents} />);
 
+    const toggle = screen.getByRole("button", { name: /AI Mentor debug/ });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggle);
     const content = screen.getByRole("log").textContent || "";
     expect(content).toContain("dynamic variables prepared");
     expect(content).toContain("COURSE_CALIBRATION");
     expect(content).toContain('"debug_mode": true');
+  });
+
+  it("stays collapsible while retaining and downloading the full log", () => {
+    const createObjectURL = vi.fn(() => "blob:debug-log");
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    render(<MentorDebugPanel events={debugEvents} />);
+    const toggle = screen.getByRole("button", { name: /AI Mentor debug/ });
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Download log" }));
+    expect(createObjectURL).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:debug-log");
+    click.mockRestore();
   });
 
   it("copies the complete formatted log", async () => {

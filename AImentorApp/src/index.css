@@ -2087,9 +2087,44 @@ html {
   border: 1px solid #263447;
   border-radius: 14px;
   background: #0b1220;
+  opacity: 0.5;
   box-shadow: 0 12px 30px rgba(8, 15, 29, 0.16);
   color: #d7e2f0;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.mentor-debug-toggle {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.mentor-debug-toggle:focus-visible {
+  outline: 2px solid #00ce8d;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.mentor-debug-chevron {
+  color: #00ce8d;
+  font-size: 9px;
+}
+
+.mentor-debug-event-count {
+  border-radius: 999px;
+  background: #263447;
+  padding: 1px 6px;
+  color: #d7e2f0;
+  font-size: 9px;
 }
 
 .mentor-debug-header {

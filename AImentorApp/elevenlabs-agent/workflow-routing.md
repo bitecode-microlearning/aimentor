@@ -12,6 +12,15 @@ At conversation start, route on the dynamic variable `conversation_type`:
 
 The missing/unknown fallback must remain the normal lesson branch for backwards compatibility.
 
+After the third knowledge-check answer feedback, every `Explain the lesson` path must transition to `Close the lesson`, using `normal-lesson-closing-prompt.md`. Remove every direct route from `Explain the lesson` to `End`. Only `Close the lesson` may transition successfully to `End`, after donation, spoken farewell, summary, and evaluation have all completed.
+
+```text
+NORMAL_LESSON / relationship lesson continuation
+  -> Explain the lesson
+  -> Close the lesson
+  -> End
+```
+
 Each relationship branch must complete its coaching phase, run its own completion Say node, and then join the shared `Explain the lesson` node. Only the direct normal route runs `Say: Greetings`. The shared lesson prompt must never generate another greeting or opening.
 
 The ElevenLabs platform First Message is the only actual greeting in the session. Despite its dashboard label, `Say: Greetings` must be a no-greeting lesson transition: it mentions the course and lesson but must not say `Hi`, `Hello`, `Welcome`, or reintroduce Ana.

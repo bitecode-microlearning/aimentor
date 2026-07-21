@@ -4,16 +4,17 @@ This folder separates shared agent behavior from conversation-specific workflow 
 
 - `system-prompt.md`: generic identity, communication, privacy, safety, reliability, and recovery rules. It contains no lesson or relationship workflow.
 - `normal-lesson-opening-prompt.md`: the no-greeting lesson transition used only by the direct normal route's `Say: Greetings` node.
-- `normal-lesson-prompt.md`: the existing lesson sequence and lesson-specific behavior.
+- `normal-lesson-prompt.md`: the teaching sequence through the final knowledge-check feedback. Use it on the `Explain the lesson` node.
+- `normal-lesson-closing-prompt.md`: the mandatory donation, farewell, summary, evaluation, and guarded End sequence. Use it on the `Close the lesson` node.
 - `course-calibration-prompt.md`: first-course relationship calibration.
 - `weekly-checkpoint-prompt.md`: weekly continuity and feedback checkpoint.
 - `workflow-routing.md`: ElevenLabs branch conditions, dynamic variables, and post-call setup.
 
-In ElevenLabs, use `system-prompt.md` as the agent-level system prompt. Route by `conversation_type` exactly as documented in `workflow-routing.md`. Only the direct normal route uses `normal-lesson-opening-prompt.md`; Course Coach and Weekly Coach begin their own workflows directly and use their completion Say nodes before merging into `Explain the lesson`.
+In ElevenLabs, use `system-prompt.md` as the agent-level system prompt. Route by `conversation_type` exactly as documented in `workflow-routing.md`. Only the direct normal route uses `normal-lesson-opening-prompt.md`; Course Coach and Weekly Coach begin their own workflows directly and use their completion Say nodes before merging into `Explain the lesson`. Every successful `Explain the lesson` path must then route to `Close the lesson`; only `Close the lesson` may route to `End`.
 
 Apply the required agent-level conversation-flow settings from `workflow-routing.md`, including the 15-second `Take turn after silence` value and the `skip_turn` system tool. Check every workflow node for a shorter turn-timeout override.
 
-`../elevenlabs-tools/system-prompt-presentation-block.txt` is reference documentation for the repository's tool contracts. It is not a separate ElevenLabs dashboard prompt and must not be pasted into a nonexistent configuration field. Its shared behavior belongs in `system-prompt.md`; normal-lesson sequencing belongs in `normal-lesson-prompt.md`; tool-specific behavior belongs in each imported client-tool JSON.
+`../elevenlabs-tools/system-prompt-presentation-block.txt` is reference documentation for the repository's tool contracts. It is not a separate ElevenLabs dashboard prompt and must not be pasted into a nonexistent configuration field. Its shared behavior belongs in `system-prompt.md`; teaching belongs in `normal-lesson-prompt.md`; closing belongs in `normal-lesson-closing-prompt.md`; tool-specific behavior belongs in each imported client-tool JSON.
 
 Keep the existing agent, tools, signed session flow, and post-call webhook. Relationship branches must not call lesson tools. Unknown or missing conversation types fall back to the normal lesson branch.
 
