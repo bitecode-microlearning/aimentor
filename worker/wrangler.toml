@@ -5,7 +5,7 @@ compatibility_date = "2025-10-19"
 [vars]
 # Minimum remaining ElevenLabs token/character budget required before creating a mentor session.
 MIN_AVAILABLE_TOKENS = "2000"
-AI_MENTOR_DAILY_LIMIT_ENABLED = "false"
+AI_MENTOR_DAILY_LIMIT_ENABLED = "true"
 RELATIONSHIP_LAYER_ENABLED = "true"
 RELATIONSHIP_CALIBRATION_ENABLED = "true"
 RELATIONSHIP_WEEKLY_CHECKPOINT_ENABLED = "true"
@@ -40,7 +40,7 @@ service = "bitecode-ai-mentor-demo"
 
 [env.production.vars]
 MIN_AVAILABLE_TOKENS = "2000"
-AI_MENTOR_DAILY_LIMIT_ENABLED = "false"
+AI_MENTOR_DAILY_LIMIT_ENABLED = "true"
 RELATIONSHIP_LAYER_ENABLED = "true"
 RELATIONSHIP_CALIBRATION_ENABLED = "true"
 RELATIONSHIP_WEEKLY_CHECKPOINT_ENABLED = "true"

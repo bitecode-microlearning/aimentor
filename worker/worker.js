@@ -275,6 +275,11 @@ function isAiMentorDailyLimitEnabled(env) {
   return String(env.AI_MENTOR_DAILY_LIMIT_ENABLED ?? "true").trim().toLowerCase() !== "false";
 }
 
+export function shouldBlockAiMentorDailyUsage({ limitEnabled, dailyLimitOverride, lastUsage, now = new Date() }) {
+  if (!limitEnabled || Number(dailyLimitOverride) === 1 || !lastUsage) return false;
+  return String(lastUsage).slice(0, 10) === now.toISOString().slice(0, 10);
+}
+
 function isDemoLessonPayload(value) {
   return value?.sessionmode === "demo" &&
     typeof value?.demosessionid === "string" &&
@@ -748,7 +753,8 @@ async function handleAIMentorUsage(action, lessonData, env) {
        s.id AS subscriptionid,
        s.status AS subscriptionstatus,
        u.status AS userstatus,
-       u.lastaimentorusage AS lastaimentorusage
+       u.lastaimentorusage AS lastaimentorusage,
+       COALESCE(u.dailylimitoverride, 0) AS dailylimitoverride
      FROM subscriptions s
      INNER JOIN users u ON u.id = s.userid
      WHERE s.id = ?`
@@ -770,11 +776,11 @@ async function handleAIMentorUsage(action, lessonData, env) {
     };
   }
 
-  if (
-    isAiMentorDailyLimitEnabled(env) &&
-    subscription.lastaimentorusage &&
-    String(subscription.lastaimentorusage).slice(0, 10) === new Date().toISOString().slice(0, 10)
-  ) {
+  if (shouldBlockAiMentorDailyUsage({
+    limitEnabled: isAiMentorDailyLimitEnabled(env),
+    dailyLimitOverride: subscription.dailylimitoverride,
+    lastUsage: subscription.lastaimentorusage,
+  })) {
     return {
       ok: false,
       status: 400,
