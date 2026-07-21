@@ -1262,7 +1262,12 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
             applyLessonPhase(phase);
             if (phase.id === "session_wrap_up") {
-              return "Displayed session topic 7 of 7: Session wrap-up. Do not end the session yet. Complete the takeaway, donation card, spoken support message and farewell, then silently call showSessionSummary and reportLessonEvaluation before ending.";
+              onLessonPresentationChange?.({
+                type: "topic",
+                title: "Preparing your lesson result",
+                points: ["Reviewing your knowledge-check answers", "Preparing your takeaway and understanding grade"],
+              });
+              return "Displayed the session wrap-up and removed the final answer-feedback card. Do not speak the takeaway yet. First call reportLessonEvaluation, then call showSessionSummary. Speak the takeaway only while the complete lesson result card is visible.";
             }
             return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
           },

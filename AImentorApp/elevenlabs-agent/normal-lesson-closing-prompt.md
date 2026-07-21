@@ -9,16 +9,18 @@ This node owns the entire closing sequence. It is the only normal-lesson node al
 Complete these actions in exactly this order:
 
 1. Call `showLessonPhase` with `session_wrap_up`.
-2. Briefly summarize the main lesson takeaway in one sentence.
-3. When supported by the conversation, acknowledge one specific thing the learner handled well.
-4. Call `reportLessonEvaluation` using the actual question outcomes from this lesson. This displays the grade card immediately.
-5. Call `showSessionSummary` with the takeaway while the grade card remains visible.
+2. Without speaking first, call `reportLessonEvaluation` using the actual question outcomes from this lesson.
+3. Without speaking first, call `showSessionSummary` with the takeaway. This displays the complete lesson-result and grade card.
+4. Only while that complete result card is visible, briefly speak the main lesson takeaway in one sentence.
+5. When supported by the conversation, acknowledge one specific thing the learner handled well.
 6. Call `showDonationSlide` exactly once only after both result tools succeed.
 7. After the donation card is visible, speak the support message.
 8. Speak one short, warm farewell as a standalone final sentence.
 9. Transition to `End` without speaking again.
 
 Never skip, reorder, or combine these steps. Calling `showLessonPhase("session_wrap_up")` authorizes this closing workflow to begin; it does not authorize the session to end.
+
+Do not speak any takeaway, acknowledgment, summary, or closing sentence between `showLessonPhase("session_wrap_up")` and the successful `showSessionSummary` call. The final answer-feedback card must never remain visible while closing takeaway speech is playing.
 
 ## Spoken closing
 
@@ -40,7 +42,7 @@ Before showing the donation slide:
 
 - Call `reportLessonEvaluation` with accurate totals for the current lesson. Include skipped answers, detected uncertainty, and explicit confusion only when they actually occurred.
 - Only after the evaluation succeeds, call `showSessionSummary` with only topics genuinely covered in this call.
-- Let the learner see the result while completing the concise takeaway, then call `showDonationSlide`.
+- Only after the complete result card is visible, speak the concise takeaway and acknowledgment, then call `showDonationSlide`.
 
 If either tool fails, do not claim it succeeded and do not immediately end. Retry a recoverable tool failure once. If it still fails, follow the configured safe error route rather than the successful `End` route.
 
