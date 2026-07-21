@@ -2797,9 +2797,9 @@ html {
   padding: 16px;
 }
 
-.lesson-understanding-mastered { --understanding-accent: #fe9613; }
-.lesson-understanding-understood { --understanding-accent: #00a976; }
-.lesson-understanding-needs_review { --understanding-accent: #1376c8; }
+.lesson-understanding-mastered { --understanding-accent: #00a976; }
+.lesson-understanding-understood { --understanding-accent: #1376c8; }
+.lesson-understanding-needs_review { --understanding-accent: #fe9613; }
 
 .lesson-understanding-eyebrow {
   margin: 0 0 5px;
@@ -2875,7 +2875,7 @@ html {
   right: 16.66%;
   height: 4px;
   content: "";
-  background: linear-gradient(90deg, #1376c8 0%, #00a976 50%, #fe9613 100%);
+  background: var(--understanding-accent);
   border-radius: 999px;
   opacity: .32;
 }

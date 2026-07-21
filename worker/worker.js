@@ -524,7 +524,7 @@ async function saveLessonEvaluation(input, lessonData, env) {
       WHERE id = ?1
         AND user_id = ?9 AND subscription_id = ?10
         AND course_id = ?11 AND lesson_id = ?12
-        AND status IN ('created', 'active')`
+        AND status IN ('created', 'active', 'completed')`
   ).bind(
     mentorSessionId,
     evaluation.status,
@@ -541,6 +541,134 @@ async function saveLessonEvaluation(input, lessonData, env) {
   ).run();
   if (result.meta.changes !== 1) throw new Error("Mentor session was not available for evaluation.");
   return evaluation;
+}
+
+function normalizeCoachingOutcome(input, lessonData) {
+  const mentorSessionId = bounded(input?.mentorSessionId, 100);
+  if (!mentorSessionId) throw new Error("Missing mentor session ID.");
+  const conversationType = bounded(input?.outcome?.conversationType, 32).toUpperCase();
+  if (!['COURSE_CALIBRATION', 'WEEKLY_CHECKPOINT'].includes(conversationType)) {
+    throw new Error("Invalid coaching conversation type.");
+  }
+  const discussionPoints = Array.isArray(input?.outcome?.discussionPoints)
+    ? input.outcome.discussionPoints.slice(0, 6).map((point) => ({
+        topic: bounded(point?.topic, 120),
+        learnerInput: bounded(point?.learnerInput, 1200),
+      })).filter((point) => point.topic && point.learnerInput)
+    : [];
+  const recapPoints = Array.isArray(input?.outcome?.recapPoints)
+    ? input.outcome.recapPoints.slice(0, 6).map((point) => bounded(point, 600)).filter(Boolean)
+    : [];
+  if (!recapPoints.length) {
+    throw new Error("Coaching outcome requires recap points.");
+  }
+  return {
+    mentorSessionId,
+    conversationType,
+    discussionPoints,
+    recapPoints,
+    userId: Number(lessonData.userid),
+    subscriptionId: Number(lessonData.subscriptionid),
+    courseId: Number(lessonData.courseid),
+    lessonId: Number(lessonData.lessonid),
+  };
+}
+
+function coachingProfileField(topic) {
+  const normalized = topic.toLowerCase();
+  if (normalized.includes('goal') || normalized.includes('priority')) return ['SUBSCRIPTION', 'courseSpecificGoal'];
+  if (normalized.includes('preference') || normalized.includes('learn best')) return ['USER', 'learningPreferences'];
+  if (normalized.includes('knowledge') || normalized.includes('domain') || normalized.includes('experience')) return ['SUBSCRIPTION', 'generalKnowledgeDomain'];
+  if (normalized.includes('block') || normalized.includes('challenge') || normalized.includes('difficult')) return ['SUBSCRIPTION', 'currentBlockers'];
+  if (normalized.includes('confidence')) return ['SUBSCRIPTION', 'currentConfidence'];
+  if (normalized.includes('interest')) return ['SUBSCRIPTION', 'currentInterests'];
+  return [null, null];
+}
+
+async function saveCoachingOutcome(input, lessonData, env) {
+  const outcome = normalizeCoachingOutcome(input, lessonData);
+  const session = await env.DB.prepare(
+    `SELECT id, conversation_type, period_key, prompt_version
+       FROM mentor_sessions
+      WHERE id = ?1 AND user_id = ?2 AND subscription_id = ?3
+        AND course_id = ?4 AND lesson_id = ?5 AND status IN ('created','active','completed')`
+  ).bind(outcome.mentorSessionId, outcome.userId, outcome.subscriptionId, outcome.courseId, outcome.lessonId).first();
+  if (!session || session.conversation_type !== outcome.conversationType) {
+    throw new Error("Mentor session was not available for this coaching outcome.");
+  }
+
+  const timestamp = Date.now();
+  const statements = [];
+  for (const [index, point] of outcome.discussionPoints.entries()) {
+    const [targetType, fieldName] = coachingProfileField(point.topic);
+    if (targetType && fieldName) {
+      const subscriptionId = targetType === 'SUBSCRIPTION' ? outcome.subscriptionId : null;
+      const scopeKey = targetType === 'SUBSCRIPTION' ? outcome.subscriptionId : 0;
+      const valueJson = JSON.stringify(point.learnerInput);
+      statements.push(env.DB.prepare(
+        `INSERT INTO relationship_profile_values
+           (id,user_id,subscription_id,scope_key,target_type,field_name,value_json,confidence,source_conversation_id,source_event_timestamp)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,0.9,?8,?9)
+         ON CONFLICT(target_type,user_id,scope_key,field_name) DO UPDATE SET
+           value_json=excluded.value_json, confidence=excluded.confidence,
+           source_conversation_id=excluded.source_conversation_id,
+           source_event_timestamp=excluded.source_event_timestamp, updated_at=CURRENT_TIMESTAMP`
+      ).bind(crypto.randomUUID(), outcome.userId, subscriptionId, scopeKey, targetType, fieldName, valueJson, outcome.mentorSessionId, timestamp));
+      statements.push(env.DB.prepare(
+        `INSERT INTO relationship_profile_update_history
+           (id,user_id,subscription_id,conversation_id,target_type,field_name,proposed_value_json,applied_value_json,confidence,reason,decision,prompt_version,schema_version)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?7,0.9,'Captured from live coaching card','APPLIED',?8,'2.0')
+         ON CONFLICT(conversation_id,target_type,field_name) DO UPDATE SET
+           proposed_value_json=excluded.proposed_value_json, applied_value_json=excluded.applied_value_json,
+           decision='APPLIED', processed_at=CURRENT_TIMESTAMP`
+      ).bind(crypto.randomUUID(), outcome.userId, subscriptionId, outcome.mentorSessionId, targetType, fieldName, valueJson, session.prompt_version || 'relationship-v1'));
+    }
+    statements.push(env.DB.prepare(
+      `INSERT INTO relationship_memory
+         (id,user_id,subscription_id,memory_type,scope,summary,importance,source_conversation_id,source_item_key,metadata_json)
+       VALUES (?1,?2,?3,'FOLLOW_UP','SUBSCRIPTION',?4,70,?5,?6,?7)
+       ON CONFLICT(source_conversation_id,source_item_key) DO UPDATE SET summary=excluded.summary, metadata_json=excluded.metadata_json`
+    ).bind(crypto.randomUUID(), outcome.userId, outcome.subscriptionId, point.learnerInput, outcome.mentorSessionId, `discussion-${index + 1}`, JSON.stringify({ topic: point.topic })));
+  }
+  for (const [index, recapPoint] of outcome.recapPoints.entries()) {
+    statements.push(env.DB.prepare(
+      `INSERT INTO relationship_memory
+         (id,user_id,subscription_id,memory_type,scope,summary,importance,source_conversation_id,source_item_key,metadata_json)
+       VALUES (?1,?2,?3,'FOLLOW_UP','SUBSCRIPTION',?4,75,?5,?6,?7)
+       ON CONFLICT(source_conversation_id,source_item_key) DO UPDATE SET summary=excluded.summary, metadata_json=excluded.metadata_json`
+    ).bind(crypto.randomUUID(), outcome.userId, outcome.subscriptionId, recapPoint, outcome.mentorSessionId, `recap-${index + 1}`, JSON.stringify({ kind: 'coaching_recap' })));
+  }
+
+  if (outcome.conversationType === 'WEEKLY_CHECKPOINT') {
+    const previous = await env.DB.prepare(
+      `SELECT id FROM relationship_checkpoint_summaries WHERE subscription_id=?1 ORDER BY created_at DESC LIMIT 1`
+    ).bind(outcome.subscriptionId).first();
+    statements.push(env.DB.prepare(
+      `INSERT INTO relationship_checkpoint_summaries
+         (id,user_id,subscription_id,conversation_id,period_key,summary,changes_since_previous_json,validation_topics_json,previous_checkpoint_id)
+       VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+       ON CONFLICT(conversation_id) DO UPDATE SET summary=excluded.summary,
+         changes_since_previous_json=excluded.changes_since_previous_json,
+         validation_topics_json=excluded.validation_topics_json`
+    ).bind(crypto.randomUUID(), outcome.userId, outcome.subscriptionId, outcome.mentorSessionId,
+      session.period_key || new Date().toISOString().slice(0, 10), outcome.recapPoints.join(' '),
+      JSON.stringify(outcome.recapPoints), JSON.stringify(outcome.discussionPoints.map((point) => point.topic)), previous?.id || null));
+    statements.push(env.DB.prepare(
+      `UPDATE subscriptions SET lastfeedbacksession=CURRENT_TIMESTAMP WHERE id=?1 AND userid=?2`
+    ).bind(outcome.subscriptionId, outcome.userId));
+  }
+  statements.push(env.DB.prepare(
+    `UPDATE mentor_sessions
+        SET status='failed', failed_at=CURRENT_TIMESTAMP,
+            failure_reason='superseded_by_completed_coaching', updated_at=CURRENT_TIMESTAMP
+      WHERE subscription_id=?1 AND conversation_type=?2 AND id<>?3 AND status='completed'
+        AND (?2='COURSE_CALIBRATION' OR period_key=?4)`
+  ).bind(outcome.subscriptionId, outcome.conversationType, outcome.mentorSessionId, session.period_key || null));
+  statements.push(env.DB.prepare(
+    `UPDATE mentor_sessions SET status='completed', completed_at=COALESCE(completed_at,CURRENT_TIMESTAMP), updated_at=CURRENT_TIMESTAMP WHERE id=?1`
+  ).bind(outcome.mentorSessionId));
+  await env.DB.batch(statements);
+  return { conversationType: outcome.conversationType, savedDiscussionPoints: outcome.discussionPoints.length, savedRecapPoints: outcome.recapPoints.length };
 }
 
 async function createMentorSession(context, env) {
@@ -738,7 +866,7 @@ export default {
       }
     }
 
-    if (pathname === "/agent" || pathname === "/usage" || pathname === "/evaluation" || pathname === "/consent") {
+    if (pathname === "/agent" || pathname === "/usage" || pathname === "/evaluation" || pathname === "/coaching-outcome" || pathname === "/consent") {
       const requiredEnv = [
         "HMAC_SECRET",
         "DB",
@@ -778,6 +906,20 @@ export default {
           }
           const evaluation = await saveLessonEvaluation(body, result.lessonData, env);
           return jsonResponse({ success: true, evaluation }, 200, corsHeaders);
+        }
+
+        if (pathname === "/coaching-outcome") {
+          if (demoMode) return jsonResponse({ success: true, demo: true }, 200, corsHeaders);
+          if (!isIdOnlyLessonPayload(result.lessonData)) {
+            return jsonResponse({ error: "Coaching outcome requires an ID-only mentor link." }, 400, corsHeaders);
+          }
+          try {
+            const outcome = await saveCoachingOutcome(body, result.lessonData, env);
+            return jsonResponse({ success: true, outcome }, 200, corsHeaders);
+          } catch (error) {
+            console.error("Coaching outcome persistence failed", error);
+            return jsonResponse({ error: "Coaching outcome could not be saved.", details: error.message }, 500, corsHeaders);
+          }
         }
 
         const action = pathname === "/agent" ? "check_aimentor_usage" : "update_aimentor_usage";

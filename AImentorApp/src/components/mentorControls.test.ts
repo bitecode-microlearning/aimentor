@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCurrentSessionGeneration, isMentorQuestionLeadIn, isRecoverableClientToolError, shouldAutoContinueMentorTurn } from "./mentorControls";
+import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCurrentSessionGeneration, isDisplayedQuestionSpoken, isMentorQuestionLeadIn, isRecoverableClientToolError, shouldAutoContinueMentorTurn } from "./mentorControls";
 
 describe("getHearingCheckRequest", () => {
   it("uses a learner-style hearing-check request without control instructions", () => {
@@ -50,10 +50,25 @@ describe("isMentorQuestionLeadIn", () => {
     expect(isMentorQuestionLeadIn("Okay, here’s a question.")).toBe(true);
     expect(isMentorQuestionLeadIn("Correct. Here's the next check.")).toBe(true);
     expect(isMentorQuestionLeadIn("Showing the next check.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Let’s try a quick check.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Try this one.")).toBe(true);
+    expect(isMentorQuestionLeadIn("Let’s test that idea.")).toBe(true);
   });
 
   it("does not classify an ordinary transition as a question cue", () => {
     expect(isMentorQuestionLeadIn("Let's continue with the lesson.")).toBe(false);
+  });
+});
+
+describe("isDisplayedQuestionSpoken", () => {
+  it("activates answer capture only after the exact displayed question is spoken", () => {
+    const question = "A dictionary can map a key to a function.";
+    expect(isDisplayedQuestionSpoken("Think this through.", question)).toBe(false);
+    expect(isDisplayedQuestionSpoken("A dictionary can map a key to a function", question)).toBe(true);
+    expect(isDisplayedQuestionSpoken(
+      "Correct. Keep that in mind. A dictionary can map a key to a function.",
+      question,
+    )).toBe(true);
   });
 });
 

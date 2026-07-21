@@ -13,6 +13,8 @@ In ElevenLabs, use `system-prompt.md` as the agent-level system prompt. Route by
 
 Apply the required agent-level conversation-flow settings from `workflow-routing.md`, including the 15-second `Take turn after silence` value and the `skip_turn` system tool. Check every workflow node for a shorter turn-timeout override.
 
+`../elevenlabs-tools/system-prompt-presentation-block.txt` is reference documentation for the repository's tool contracts. It is not a separate ElevenLabs dashboard prompt and must not be pasted into a nonexistent configuration field. Its shared behavior belongs in `system-prompt.md`; normal-lesson sequencing belongs in `normal-lesson-prompt.md`; tool-specific behavior belongs in each imported client-tool JSON.
+
 Keep the existing agent, tools, signed session flow, and post-call webhook. Relationship branches must not call lesson tools. Unknown or missing conversation types fall back to the normal lesson branch.
 
 ## Relationship presentation client tools

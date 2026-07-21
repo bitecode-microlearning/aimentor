@@ -9,6 +9,7 @@ import {
   getReadableError,
   isClosingFarewellMessage,
   isCurrentSessionGeneration,
+  isDisplayedQuestionSpoken,
   isMentorQuestionLeadIn,
   isRecoverableClientToolError,
   shouldAutoContinueMentorTurn,
@@ -35,6 +36,7 @@ import {
   type AnswerFeedbackSlideInput,
   type CodeSlideInput,
   type CoachingDiscussionSlideInput,
+  type CoachingDiscussionPoint,
   type CoachingRecapSlideInput,
   type LessonPresentationSlide,
   type LessonPhase,
@@ -98,7 +100,7 @@ type TokenAvailabilityDebug = {
 const ESTIMATED_SESSION_SECONDS = 480;
 const USAGE_REGISTRATION_DELAY_MS = 60 * 1000;
 const USAGE_REGISTRATION_RETRY_DELAYS_MS = [10 * 1000, 30 * 1000, 60 * 1000];
-const INITIAL_LEARNER_RESPONSE_WAIT_MS = 15_000;
+const INITIAL_LEARNER_RESPONSE_WAIT_MS = 30_000;
 const HEARING_CHECK_RESPONSE_WAIT_MS = 4000;
 const LEARNER_VOICE_ACTIVITY_THRESHOLD = 0.35;
 const LEARNER_VOICE_ACTIVITY_SAMPLES = 2;
@@ -267,6 +269,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [hasElevenLabsSessionStarted, setHasElevenLabsSessionStarted] = useState(false);
   const [isTokenSupportScreenVisible, setIsTokenSupportScreenVisible] = useState(false);
   const [connectionStatusMessage, setConnectionStatusMessage] = useState("");
+  const [backgroundStatusMessage, setBackgroundStatusMessage] = useState("");
   const [lessonPhase, setLessonPhase] = useState<LessonPhase | null>(null);
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
   const [debugMode, setDebugMode] = useState(false);
@@ -294,12 +297,15 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const activeMentorSessionIdRef = useRef<string | null>(null);
   const previousReviewActiveRef = useRef(false);
   const relationshipPhaseAcknowledgedRef = useRef(false);
+  const latestCoachingDiscussionRef = useRef<CoachingDiscussionPoint[]>([]);
   const previousReviewFeedbackCountRef = useRef(0);
   const deferredLessonPhaseRef = useRef<LessonPhase | null>(null);
   const pendingKnowledgeCheckPhaseRef = useRef<LessonPhase | null>(null);
   const lastDisplayedTopicTitleRef = useRef("");
   const learnerAnswerExpectedRef = useRef(false);
   const questionToolPendingRef = useRef(false);
+  const pendingSpokenQuestionRef = useRef("");
+  const spokenQuestionContinuationRequestedRef = useRef(false);
   const learnerResponseTimerRef = useRef<number | null>(null);
   const hearingCheckIssuedRef = useRef(false);
   const hearingCheckSpokenRef = useRef(false);
@@ -334,14 +340,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setLessonPhase(phase);
   };
 
-  const finalizeLessonPresentation = () => {
+  const finalizeLessonPresentation = (showCleanCloseFallback = false) => {
     if (presentationFinalizedRef.current) return;
     presentationFinalizedRef.current = true;
     const completedEvaluation = pendingCurrentEvaluationRef.current;
-    const completedSummary = pendingSummarySlideRef.current ?? (completedEvaluation ? {
+    const completedSummary = pendingSummarySlideRef.current ?? (completedEvaluation || showCleanCloseFallback ? {
       type: "summary" as const,
       title: lessonname || "Session complete",
-      coveredTopics: [],
+      coveredTopics: lessonname ? [lessonname] : [],
+      ...(showCleanCloseFallback && !completedEvaluation
+        ? { takeaway: "The mentor session finished before its structured result was prepared." }
+        : {}),
       encouragement: "Thanks for taking part in this AI mentor session.",
     } : null);
     pendingCurrentEvaluationRef.current = null;
@@ -440,6 +449,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     lastDisplayedTopicTitleRef.current = "";
     learnerAnswerExpectedRef.current = false;
     questionToolPendingRef.current = false;
+    pendingSpokenQuestionRef.current = "";
+    spokenQuestionContinuationRequestedRef.current = false;
     initialGreetingReceivedRef.current = false;
     startupContinuationSentRef.current = false;
     startupContinuationPendingRef.current = false;
@@ -580,7 +591,16 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       }
       lastMentorMessageRef.current = text;
       setLastMentorMessage(text);
-      questionToolPendingRef.current = isMentorQuestionLeadIn(text);
+      const pendingSpokenQuestion = pendingSpokenQuestionRef.current;
+      if (pendingSpokenQuestion && isDisplayedQuestionSpoken(text, pendingSpokenQuestion)) {
+        pendingSpokenQuestionRef.current = "";
+        spokenQuestionContinuationRequestedRef.current = false;
+        questionToolPendingRef.current = false;
+        learnerAnswerExpectedRef.current = true;
+        appendDebugEvent("question", "displayed question spoken; learner answer now expected");
+      } else if (!pendingSpokenQuestion) {
+        questionToolPendingRef.current = isMentorQuestionLeadIn(text);
+      }
       debugMentorControls("mentor message", text);
 
       if (
@@ -675,10 +695,41 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       }
 
       const lastMentorMessage = lastMentorMessageRef.current.trim();
-      if (questionToolPendingRef.current) {
+      if (pendingSpokenQuestionRef.current) {
         setMicrophoneMuted(true);
         setControlState("mentor_speaking");
-        appendDebugEvent("question", "waiting for question tool after mentor lead-in");
+        if (!spokenQuestionContinuationRequestedRef.current) {
+          spokenQuestionContinuationRequestedRef.current = true;
+          appendDebugEvent("question", "question tool completed but displayed question was not spoken; requesting it now");
+          try {
+            const continuation = conversationRef.current?.sendUserMessage?.(TURN_CONTINUATION_REQUEST);
+            if (continuation && typeof (continuation as Promise<void>).catch === "function") {
+              (continuation as Promise<void>).catch((error) => {
+                appendDebugEvent("error", "spoken question recovery failed", error);
+              });
+            }
+          } catch (error) {
+            appendDebugEvent("error", "spoken question recovery failed", error);
+          }
+        }
+        return;
+      }
+      if (questionToolPendingRef.current) {
+        questionToolPendingRef.current = false;
+        lastAutoContinuedMentorMessageRef.current = lastMentorMessage;
+        setMicrophoneMuted(true);
+        setControlState("mentor_speaking");
+        appendDebugEvent("question", "question tool missing after mentor lead-in; requesting continuation");
+        try {
+          const continuation = conversationRef.current?.sendUserMessage?.(TURN_CONTINUATION_REQUEST);
+          if (continuation && typeof (continuation as Promise<void>).catch === "function") {
+            (continuation as Promise<void>).catch((error) => {
+              appendDebugEvent("error", "question tool recovery failed", error);
+            });
+          }
+        } catch (error) {
+          appendDebugEvent("error", "question tool recovery failed", error);
+        }
         return;
       }
       if (
@@ -845,6 +896,32 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     debugMentorControls("lesson evaluation saved", { status: evaluation.status });
   };
 
+  const persistCoachingOutcome = async (discussionPoints: CoachingDiscussionPoint[], recapPoints: string[]) => {
+    if (!signedData || !signedSig || !activeMentorSessionIdRef.current) {
+      throw new Error("The coaching outcome could not be linked to this mentor session.");
+    }
+    const cfg = await import("../config/workerConfig");
+    const outcomeUrl = cfg.WORKER_AGENT_URL?.replace(/\/agent\/?$/, "/coaching-outcome");
+    if (!outcomeUrl) throw new Error("The coaching outcome service is unavailable.");
+    const response = await fetch(outcomeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: signedData,
+        sig: signedSig,
+        mentorSessionId: activeMentorSessionIdRef.current,
+        outcome: { conversationType: conversationtype, discussionPoints, recapPoints },
+      }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      const message = typeof result?.error === "string" ? result.error : "The coaching outcome could not be saved.";
+      const details = typeof result?.details === "string" && result.details.trim() ? ` ${result.details.trim()}` : "";
+      throw new Error(`${message}${details}`);
+    }
+    appendDebugEvent("coaching", "coaching outcome saved", { conversationType: conversationtype, discussionPoints: discussionPoints.length, recapPoints: recapPoints.length });
+  };
+
   const handleStartConversation = async () => {
     setDebugEvents([]);
     debugEventIdRef.current = 0;
@@ -858,16 +935,20 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     closingFarewellDetectedRef.current = false;
     learnerAnswerExpectedRef.current = false;
     questionToolPendingRef.current = false;
+    pendingSpokenQuestionRef.current = "";
+    spokenQuestionContinuationRequestedRef.current = false;
     resetSilenceRecovery();
     presentationFinalizedRef.current = false;
-    onLessonPresentationChange?.(createInitialCoachingDiscussionSlide({
+    const initialCoachingSlide = createInitialCoachingDiscussionSlide({
       conversationType: conversationtype,
       courseGoal: coursegoal,
       learnerGoal: userlearninggoal,
       userPreferences: userpreferences,
       knowledgeDomain: knowledgedomain,
       relationshipContext: relationshipcontext,
-    }));
+    });
+    latestCoachingDiscussionRef.current = initialCoachingSlide?.points ?? [];
+    onLessonPresentationChange?.(initialCoachingSlide);
     setErrorMessage(null);
     setIsTokenSupportScreenVisible(false);
     setTokenSupportDebugMessage("");
@@ -876,6 +957,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     startupContinuationPendingRef.current = false;
     lastAutoContinuedMentorMessageRef.current = "";
     applyLessonPhase(initialLessonPhase(conversationtype));
+    setBackgroundStatusMessage(conversationtype === "COURSE_CALIBRATION"
+      ? "Preparing course calibration..."
+      : conversationtype === "WEEKLY_CHECKPOINT"
+        ? "Preparing weekly checkpoint..."
+        : "");
     relationshipPhaseAcknowledgedRef.current = conversationtype !== "COURSE_CALIBRATION"
       && conversationtype !== "WEEKLY_CHECKPOINT";
     previousReviewActiveRef.current = false;
@@ -1053,7 +1139,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             closeCode: "closeCode" in details ? details.closeCode : undefined,
           });
           appendDebugEvent("sdk", "session disconnected", details);
-          finalizeLessonPresentation();
+          const cleanAgentClose = details.reason === "agent"
+            && (!("closeCode" in details) || details.closeCode === 1000);
+          finalizeLessonPresentation(cleanAgentClose);
           setErrorMessage(disconnectMessage);
           userRequestedEndRef.current = false;
           resetSessionState("disconnected");
@@ -1111,6 +1199,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             }
 
             if (requiredRelationshipPhase && phase.id !== requiredRelationshipPhase) {
+              setBackgroundStatusMessage("");
               if (phase.id === "main_lesson") {
                 onLessonPresentationChange?.(createMainLessonTopicSlide(lessonname, content));
               } else if (phase.id === "introduction" || phase.id === "previous_lesson_review" || phase.id === "calibration") {
@@ -1137,6 +1226,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             }
 
             applyLessonPhase(phase);
+            if (phase.id === "session_wrap_up") {
+              return "Displayed session topic 7 of 7: Session wrap-up. Do not end the session yet. Complete the takeaway, donation card, spoken support message and farewell, then silently call showSessionSummary and reportLessonEvaluation before ending.";
+            }
             return `Displayed session topic ${phase.current} of ${phase.total}: ${phase.title}.`;
           },
           showLessonTopic: async (payload: TopicSlideInput) => {
@@ -1174,6 +1266,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             const title = normalizePresentationText(payload?.title, defaultTitle, 180);
             const points = normalizeCoachingDiscussionPoints(payload?.points, 6);
             if (!points.length) throw new Error("A coaching discussion card requires at least one discussion topic.");
+            latestCoachingDiscussionRef.current = points;
+            setBackgroundStatusMessage("");
             onLessonPresentationChange?.({ type: "coaching_discussion", title, points });
             return `Displayed ${points.length} discussed point${points.length === 1 ? "" : "s"}, including the learner's stated input.`;
           },
@@ -1186,7 +1280,16 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             if (!points.length) throw new Error("A coaching recap card requires at least one supported takeaway.");
             relationshipPhaseAcknowledgedRef.current = true;
             onLessonPresentationChange?.({ type: "coaching_recap", title, points });
-            return `Displayed the coaching recap with ${points.length} main point${points.length === 1 ? "" : "s"}.`;
+            setBackgroundStatusMessage("Saving coaching results...");
+            try {
+              await persistCoachingOutcome(latestCoachingDiscussionRef.current, points);
+              setBackgroundStatusMessage("Coaching saved. Preparing the lesson...");
+            } catch (error) {
+              setBackgroundStatusMessage("");
+              appendDebugEvent("coaching", "coaching outcome save failed", getReadableError(error));
+              throw error;
+            }
+            return `Displayed the coaching recap and saved ${points.length} main point${points.length === 1 ? "" : "s"}.`;
           },
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
@@ -1195,7 +1298,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
             }
-            learnerAnswerExpectedRef.current = true;
+            learnerAnswerExpectedRef.current = false;
+            pendingSpokenQuestionRef.current = question;
+            spokenQuestionContinuationRequestedRef.current = false;
             questionToolPendingRef.current = false;
             onLessonPresentationChange?.({
               type: "question",
@@ -1211,7 +1316,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
             }
-            learnerAnswerExpectedRef.current = true;
+            learnerAnswerExpectedRef.current = false;
+            pendingSpokenQuestionRef.current = question;
+            spokenQuestionContinuationRequestedRef.current = false;
             questionToolPendingRef.current = false;
             onLessonPresentationChange?.({ type: "question", questionKind: "true_false", question });
             return "Displayed the true-or-false question. Speak the exact question now without any intervening words.";
@@ -1223,7 +1330,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
             }
-            learnerAnswerExpectedRef.current = true;
+            learnerAnswerExpectedRef.current = false;
+            pendingSpokenQuestionRef.current = question;
+            spokenQuestionContinuationRequestedRef.current = false;
             questionToolPendingRef.current = false;
             onLessonPresentationChange?.({ type: "question", questionKind: "explanation", question });
             return "Displayed the explanation question. Speak the exact question now without any intervening words.";
@@ -1316,7 +1425,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               debugMentorControls("lesson evaluation persistence failed", getReadableError(error));
             }
             closingEvaluationCompletedRef.current = true;
-            return `Processed the lesson outcome: ${evaluation.status}. Do not add another teaching or reinforcement loop. Speak one short declarative farewell, without asking a question or offering more help, and then end the session. The result will appear after the call ends.`;
+            return `Processed the lesson outcome: ${evaluation.status}. The donation card, support message, and spoken farewell must already be complete. Do not speak again, add teaching, ask a question, or repeat the goodbye. End the session now; the result will appear after the call ends.`;
           },
         }, appendDebugEvent),
       });
@@ -1391,6 +1500,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const getStatusLabel = () => {
+    if (backgroundStatusMessage) return backgroundStatusMessage;
     if (mentorSessionState === "connecting") return "Connecting...";
     if (mentorSessionState === "mentor_speaking") return "Mentor is explaining...";
     if (mentorSessionState === "mentor_thinking") return "Agent is thinking...";
@@ -1485,9 +1595,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         >
           <div className="mentor-status-content">
             {mentorSessionState === "mentor_speaking" && <Volume2 className="mentor-status-icon mentor-status-icon-green" size={24} />}
-            {(mentorSessionState === "connecting" || mentorSessionState === "mentor_thinking") && <div className="mentor-status-spinner" />}
+            {(backgroundStatusMessage || mentorSessionState === "connecting" || mentorSessionState === "mentor_thinking") && <div className="mentor-status-spinner" />}
             <div className="mentor-status-text">
-              <p>{activeTopicHeader?.primary || statusLabel}</p>
+              <p>{backgroundStatusMessage || activeTopicHeader?.primary || statusLabel}</p>
               {activeTopicHeader?.secondary && <span className="mentor-status-secondary">{activeTopicHeader.secondary}</span>}
               {mentorSessionState === "mentor_waiting_for_answer" && userManuallyMuted && (
                 <span>You muted manually. The app will wait until the next mentor question.</span>

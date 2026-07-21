@@ -40,7 +40,14 @@ export function isMentorQuestionLeadIn(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/[’]/g, "'");
   if (!normalized) return false;
 
-  return /(?:here(?:'s| is) (?:a|the|your|next) question|here(?:'s| is) (?:a|the|your|next) check|showing (?:a|the|your|next) (?:question|check)|next (?:question|check))\.?\s*$/.test(normalized);
+  return /(?:here(?:'s| is) (?:a|the|your|next) (?:quick )?(?:question|check)(?: to think through)?|showing (?:a|the|your|next) (?:question|check)|next (?:question|check)|let's (?:try|do|take|use) (?:a|the) (?:quick )?(?:question|check)|let's test that idea|try this one|think this through)\.?\s*$/.test(normalized);
+}
+
+export function isDisplayedQuestionSpoken(message: string, displayedQuestion: string): boolean {
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ").replace(/[.!?]+$/g, "");
+  const expected = normalize(displayedQuestion);
+  const spoken = normalize(message);
+  return Boolean(expected) && (spoken === expected || spoken.endsWith(` ${expected}`));
 }
 
 export function isClosingFarewellMessage(message: string): boolean {
