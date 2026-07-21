@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCurrentSessionGeneration, isDisplayedQuestionSpoken, isMentorQuestionLeadIn, isRecoverableClientToolError, shouldAutoContinueMentorTurn } from "./mentorControls";
+import { advanceVoiceActivitySamples, getHearingCheckRequest, isClosingFarewellMessage, isCurrentSessionGeneration, isDisplayedQuestionSpoken, isMentorQuestionLeadIn, isRecoverableClientToolError, remainingMinimumDisplayMs, shouldAutoContinueMentorTurn } from "./mentorControls";
+
+describe("remainingMinimumDisplayMs", () => {
+  it("holds a newly displayed card for the configured minimum", () => {
+    expect(remainingMinimumDisplayMs(1_000, 4_000, 10_000)).toBe(7_000);
+  });
+
+  it("releases an expired or absent card immediately", () => {
+    expect(remainingMinimumDisplayMs(1_000, 11_000, 10_000)).toBe(0);
+    expect(remainingMinimumDisplayMs(null, 4_000, 10_000)).toBe(0);
+  });
+});
 
 describe("getHearingCheckRequest", () => {
   it("uses a learner-style hearing-check request without control instructions", () => {

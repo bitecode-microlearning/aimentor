@@ -3,7 +3,7 @@
   "name": "showCodeExample",
   "description": "Display the exact code fragment, data record, trace, JSON, SQL, or structured example being explained. The content is rendered in a VS Code-style window with preserved whitespace and line numbers.",
   "expects_response": true,
-  "response_timeout_secs": 5,
+  "response_timeout_secs": 30,
   "parameters": [
     { "id": "title", "type": "string", "description": "Short title describing the example.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },
     { "id": "language", "type": "string", "description": "Formatting label such as python, javascript, typescript, json, sql, text, record, or trace.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": false, "enum": null },

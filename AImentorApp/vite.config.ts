@@ -2,8 +2,29 @@
   import { defineConfig } from 'vite';
   import react from '@vitejs/plugin-react-swc';
   import path from 'path';
+  import { readFileSync } from 'node:fs';
+
+ const packageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, './package.json'), 'utf8'),
+ ) as { version?: string };
+ const buildDate = new Date().toISOString();
+ const buildStamp = buildDate.replace(/\D/g, '').slice(0, 14);
+ const buildInfo = {
+  version: packageJson.version || '0.0.0',
+  buildNumber: process.env.BUILD_NUMBER || `${packageJson.version || '0.0.0'}-${buildStamp}`,
+  buildDate,
+  commit: (
+    process.env.CF_PAGES_COMMIT_SHA
+    || process.env.GITHUB_SHA
+    || process.env.COMMIT_SHA
+    || 'unavailable'
+  ).slice(0, 12),
+ };
 
  export default defineConfig({
+  define: {
+    __APP_BUILD_INFO__: JSON.stringify(buildInfo),
+  },
   plugins: [
     react({
       jsxImportSource: "react",

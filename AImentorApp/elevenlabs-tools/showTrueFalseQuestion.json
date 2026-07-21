@@ -3,7 +3,7 @@
   "name": "showTrueFalseQuestion",
   "description": "Display one workflow true-or-false understanding check. First speak one short varied cue, such as Let's try a quick check, Try this one, or Let's test that idea. Do not repeat the same cue throughout the session. Only after the cue has been spoken, call this tool, then immediately speak the supplied statement with no intervening words.",
   "expects_response": true,
-  "response_timeout_secs": 5,
+  "response_timeout_secs": 30,
   "parameters": [
     { "id": "question", "type": "string", "description": "Only the statement itself. Never begin or end with True or false because the card already displays that heading. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],

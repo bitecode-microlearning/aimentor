@@ -3,7 +3,7 @@
   "name": "showDonationSlide",
   "description": "Show BiteCode's fixed ad-free support slide exactly once during every completed normal lesson. Call it in the final closing sequence before speaking the configured support message and before the goodbye. Never use it during relationship coaching. The client owns the trusted donation text and URL.",
   "expects_response": true,
-  "response_timeout_secs": 5,
+  "response_timeout_secs": 30,
   "parameters": [],
   "dynamic_variables": { "dynamic_variable_placeholders": {} },
   "assignments": [],

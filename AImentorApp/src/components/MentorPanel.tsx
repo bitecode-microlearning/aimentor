@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Conversation, type DisconnectionDetails } from "@elevenlabs/client";
+
+declare const __APP_BUILD_INFO__: {
+  version: string;
+  buildNumber: string;
+  buildDate: string;
+  commit: string;
+};
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
 import {
@@ -12,6 +19,7 @@ import {
   isDisplayedQuestionSpoken,
   isMentorQuestionLeadIn,
   isRecoverableClientToolError,
+  remainingMinimumDisplayMs,
   shouldAutoContinueMentorTurn,
   type MentorControlState,
 } from "./mentorControls";
@@ -106,6 +114,7 @@ const LEARNER_VOICE_ACTIVITY_THRESHOLD = 0.35;
 const LEARNER_VOICE_ACTIVITY_SAMPLES = 2;
 const STARTUP_CONTINUATION_REQUEST = "Hello.";
 const TURN_CONTINUATION_REQUEST = "Please continue.";
+const MINIMUM_CODE_CARD_DISPLAY_MS = 10_000;
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/bitecode";
 const mentorVideos = Object.entries(
   import.meta.glob("./img/*.mp4", { eager: true, query: "?url", import: "default" })
@@ -315,6 +324,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const startupContinuationSentRef = useRef(false);
   const startupContinuationPendingRef = useRef(false);
   const lastAutoContinuedMentorMessageRef = useRef("");
+  const codeCardDisplayedAtRef = useRef<number | null>(null);
+  const codeExplanationActiveRef = useRef(false);
   const sessionGenerationRef = useRef(0);
 
   const mentorVideoSrc = ((mentorVideo as any)?.default as string) || (mentorVideo as string);
@@ -455,6 +466,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     startupContinuationSentRef.current = false;
     startupContinuationPendingRef.current = false;
     lastAutoContinuedMentorMessageRef.current = "";
+    codeCardDisplayedAtRef.current = null;
+    codeExplanationActiveRef.current = false;
     resetSilenceRecovery();
     sessionStartedAtRef.current = null;
     usageRegistrationStartedRef.current = false;
@@ -465,6 +478,21 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setHasElevenLabsSessionStarted(false);
     setIsActionBusy(false);
     setControlState(nextState);
+  };
+
+  const releaseCodeCard = async () => {
+    if (!codeExplanationActiveRef.current) return;
+    const remainingMs = remainingMinimumDisplayMs(
+      codeCardDisplayedAtRef.current,
+      Date.now(),
+      MINIMUM_CODE_CARD_DISPLAY_MS,
+    );
+    if (remainingMs > 0) {
+      appendDebugEvent("presentation", "holding code card for minimum display time", { remainingMs });
+      await new Promise<void>((resolve) => window.setTimeout(resolve, remainingMs));
+    }
+    codeCardDisplayedAtRef.current = null;
+    codeExplanationActiveRef.current = false;
   };
 
   const sendMentorInstruction = async (instruction: string) => {
@@ -684,7 +712,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       if (initialGreetingReceivedRef.current && !startupContinuationSentRef.current) {
         setMicrophoneMuted(true);
-        setControlState("mentor_speaking");
+        setControlState("mentor_thinking");
         continueAfterInitialGreeting();
         return;
       }
@@ -697,7 +725,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       const lastMentorMessage = lastMentorMessageRef.current.trim();
       if (pendingSpokenQuestionRef.current) {
         setMicrophoneMuted(true);
-        setControlState("mentor_speaking");
+        setControlState("mentor_thinking");
         if (!spokenQuestionContinuationRequestedRef.current) {
           spokenQuestionContinuationRequestedRef.current = true;
           appendDebugEvent("question", "question tool completed but displayed question was not spoken; requesting it now");
@@ -718,7 +746,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         questionToolPendingRef.current = false;
         lastAutoContinuedMentorMessageRef.current = lastMentorMessage;
         setMicrophoneMuted(true);
-        setControlState("mentor_speaking");
+        setControlState("mentor_thinking");
         appendDebugEvent("question", "question tool missing after mentor lead-in; requesting continuation");
         try {
           const continuation = conversationRef.current?.sendUserMessage?.(TURN_CONTINUATION_REQUEST);
@@ -739,7 +767,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         lastAutoContinuedMentorMessageRef.current = lastMentorMessage;
         learnerAnswerExpectedRef.current = false;
         setMicrophoneMuted(true);
-        setControlState("mentor_speaking");
+        setControlState("mentor_thinking");
         appendDebugEvent("continuation", "declarative mentor turn continued without learner acknowledgment");
         try {
           const continuation = conversationRef.current?.sendUserMessage?.(TURN_CONTINUATION_REQUEST);
@@ -956,6 +984,8 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     startupContinuationSentRef.current = false;
     startupContinuationPendingRef.current = false;
     lastAutoContinuedMentorMessageRef.current = "";
+    codeCardDisplayedAtRef.current = null;
+    codeExplanationActiveRef.current = false;
     applyLessonPhase(initialLessonPhase(conversationtype));
     setBackgroundStatusMessage(conversationtype === "COURSE_CALIBRATION"
       ? "Preparing course calibration..."
@@ -1006,6 +1036,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       setDebugMode(responseDebugMode);
       if (responseDebugMode) {
         appendDebugEvent("bootstrap", "debug mode enabled", {
+          build: __APP_BUILD_INFO__,
           httpStatus: res.status,
           mentorContextMode: data?.mentor_context_mode,
           mentorSessionId: data?.mentor_session_id || mentorSessionId || null,
@@ -1238,6 +1269,10 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               return "This topic was already displayed. Kept the current code, question, or feedback slide visible.";
             }
             const points = normalizePresentationItems(payload?.points);
+            if (codeExplanationActiveRef.current) {
+              appendDebugEvent("presentation", "topic slide suppressed while code explanation remains active", { title });
+              return "Kept the code example visible while it is still being explained. Continue speaking without replacing it with another topic card.";
+            }
             lastDisplayedTopicTitleRef.current = normalizedTitle;
             onLessonPresentationChange?.({ type: "topic", title, points });
             return "Displayed the current topic in the lesson presentation area.";
@@ -1294,6 +1329,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showMentorQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Mentor question text is required.");
+            await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
@@ -1312,6 +1348,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showTrueFalseQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizeTrueFalseQuestion(payload?.question);
             if (!question) throw new Error("True-or-false question text is required.");
+            await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
@@ -1326,6 +1363,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           showExplanationQuestion: async (payload: QuestionSlideInput) => {
             const question = normalizePresentationText(payload?.question, "", 600);
             if (!question) throw new Error("Explanation question text is required.");
+            await releaseCodeCard();
             if (pendingKnowledgeCheckPhaseRef.current) {
               applyLessonPhase(pendingKnowledgeCheckPhaseRef.current);
               pendingKnowledgeCheckPhaseRef.current = null;
@@ -1368,6 +1406,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
             const title = normalizePresentationText(payload?.title, "Example", 180);
             const language = normalizePresentationText(payload?.language, "text", 40).toLowerCase();
             const explanation = normalizePresentationText(payload?.explanation, "", 500);
+            await releaseCodeCard();
             onLessonPresentationChange?.({
               type: "code",
               title,
@@ -1375,13 +1414,19 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               code,
               ...(explanation ? { explanation } : {}),
             });
+            codeCardDisplayedAtRef.current = Date.now();
+            codeExplanationActiveRef.current = true;
             return "Displayed the exact code or data example in the lesson presentation area.";
           },
           showDonationSlide: async () => {
+            await releaseCodeCard();
             onLessonPresentationChange?.({ type: "donation" });
             return "Displayed the BiteCode ad-free support slide. Continue the conversation naturally.";
           },
           showSessionSummary: async (payload: SummarySlideInput) => {
+            if (!closingEvaluationCompletedRef.current) {
+              return "Lesson evaluation is still required. Call reportLessonEvaluation with the actual question results before preparing the session summary.";
+            }
             const coveredTopics = normalizePresentationItems(payload?.coveredTopics);
             const title = normalizePresentationText(payload?.title, lessonname || "Session complete", 180);
             const takeaway = normalizePresentationText(payload?.takeaway, "", 500);

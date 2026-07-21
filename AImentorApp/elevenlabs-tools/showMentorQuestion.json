@@ -3,7 +3,7 @@
   "name": "showMentorQuestion",
   "description": "Legacy generic question card. Prefer showTrueFalseQuestion or showExplanationQuestion. If used, first speak one short varied question cue, then call this tool and immediately speak the exact question with no intervening words.",
   "expects_response": true,
-  "response_timeout_secs": 5,
+  "response_timeout_secs": 30,
   "parameters": [
     { "id": "question", "type": "string", "description": "Only the exact learner-facing question that will be spoken next. Do not add setup, a hint, or an answer.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],

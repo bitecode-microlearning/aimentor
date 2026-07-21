@@ -3,7 +3,7 @@
   "name": "showExplanationQuestion",
   "description": "Display one open explanation, reasoning, or calibration question. First speak one short varied cue, such as Here's a question to think through, Think this through, or Let's try a quick check. Do not repeat the same cue throughout the session. Only after the cue has been spoken, call this tool, then immediately speak the supplied question with no intervening words.",
   "expects_response": true,
-  "response_timeout_secs": 5,
+  "response_timeout_secs": 30,
   "parameters": [
     { "id": "question", "type": "string", "description": "Only the exact open question that will be spoken next. Do not include a lead-in, hint, answer, or explanation.", "dynamic_variable": "", "constant_value": "", "value_type": "llm_prompt", "required": true, "enum": null }
   ],

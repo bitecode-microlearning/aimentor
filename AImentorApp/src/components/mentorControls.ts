@@ -36,6 +36,11 @@ export function shouldAutoContinueMentorTurn(message: string, explicitAnswerExpe
   return Boolean(message.trim()) && !explicitAnswerExpected && !isMentorAskingQuestion(message);
 }
 
+export function remainingMinimumDisplayMs(displayedAt: number | null, now: number, minimumMs: number): number {
+  if (displayedAt === null || !Number.isFinite(displayedAt) || !Number.isFinite(now) || minimumMs <= 0) return 0;
+  return Math.max(0, minimumMs - Math.max(0, now - displayedAt));
+}
+
 export function isMentorQuestionLeadIn(message: string): boolean {
   const normalized = message.trim().toLowerCase().replace(/[’]/g, "'");
   if (!normalized) return false;
