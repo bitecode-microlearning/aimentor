@@ -275,9 +275,19 @@ function isAiMentorDailyLimitEnabled(env) {
   return String(env.AI_MENTOR_DAILY_LIMIT_ENABLED ?? "true").trim().toLowerCase() !== "false";
 }
 
-export function shouldBlockAiMentorDailyUsage({ limitEnabled, dailyLimitOverride, lastUsage, now = new Date() }) {
+export function shouldBlockAiMentorDailyUsage({ limitEnabled, dailyLimitOverride, lastUsage, now = new Date(), timezone = "Europe/Budapest" }) {
   if (!limitEnabled || Number(dailyLimitOverride) === 1 || !lastUsage) return false;
-  return String(lastUsage).slice(0, 10) === now.toISOString().slice(0, 10);
+  return String(lastUsage).slice(0, 10) === mentorUsageDateKey(now, timezone);
+}
+
+export function mentorUsageDateKey(now = new Date(), timezone = "Europe/Budapest") {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function isDemoLessonPayload(value) {
@@ -754,9 +764,11 @@ async function handleAIMentorUsage(action, lessonData, env) {
        s.status AS subscriptionstatus,
        u.status AS userstatus,
        u.lastaimentorusage AS lastaimentorusage,
-       COALESCE(u.dailylimitoverride, 0) AS dailylimitoverride
+       COALESCE(u.dailylimitoverride, 0) AS dailylimitoverride,
+       p.timezone AS usertimezone
      FROM subscriptions s
      INNER JOIN users u ON u.id = s.userid
+     LEFT JOIN profiles p ON p.user_id = u.id
      WHERE s.id = ?`
   ).bind(validation.subscriptionid).first();
 
@@ -776,10 +788,13 @@ async function handleAIMentorUsage(action, lessonData, env) {
     };
   }
 
+  const usageTimezone = relationshipConfig(env, subscription.usertimezone).timezone;
+
   if (shouldBlockAiMentorDailyUsage({
     limitEnabled: isAiMentorDailyLimitEnabled(env),
     dailyLimitOverride: subscription.dailylimitoverride,
     lastUsage: subscription.lastaimentorusage,
+    timezone: usageTimezone,
   })) {
     return {
       ok: false,
@@ -791,9 +806,9 @@ async function handleAIMentorUsage(action, lessonData, env) {
   if (action === "update_aimentor_usage") {
     await env.DB.prepare(
       `UPDATE users
-       SET lastaimentorusage = date('now')
+       SET lastaimentorusage = ?
        WHERE id = ?`
-    ).bind(subscription.userid).run();
+    ).bind(mentorUsageDateKey(new Date(), usageTimezone), subscription.userid).run();
   }
 
   return {
