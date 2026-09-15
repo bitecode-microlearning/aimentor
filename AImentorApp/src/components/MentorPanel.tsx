@@ -9,6 +9,7 @@ declare const __APP_BUILD_INFO__: {
 };
 import { Button } from "./ui/button";
 import { MentorControlBar } from "./MentorControlBar";
+import { MentorTestChat, type TestChatMessage } from "./MentorTestChat";
 import {
   advanceVoiceActivitySamples,
   debugMentorControls,
@@ -59,6 +60,7 @@ import { formatSessionTopicHeader } from "./sessionTopicHeader";
 import { MentorDebugPanel, type MentorDebugEvent } from "./MentorDebugPanel";
 
 interface MentorPanelProps {
+  courseTestMode?: boolean;
   userfirstname?: string;
   coursename?: string;
   lessonname?: string;
@@ -239,6 +241,7 @@ const getTokenDebugMessage = (data: any) => {
 };
 
 const MentorPanel: React.FC<MentorPanelProps> = ({
+  courseTestMode = false,
   userfirstname,
   coursename,
   lessonname,
@@ -285,6 +288,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const [tokenSupportDebugMessage, setTokenSupportDebugMessage] = useState("");
   const [debugMode, setDebugMode] = useState(false);
   const [debugEvents, setDebugEvents] = useState<MentorDebugEvent[]>([]);
+  const [testMessages, setTestMessages] = useState<TestChatMessage[]>([]);
   const debugModeRef = useRef(false);
   const debugEventIdRef = useRef(0);
   const [mentorVideo] = useState(pickRandomMentorVideo);
@@ -600,6 +604,15 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     if (!text) return;
 
+    if (courseTestMode && ["ai", "agent", "assistant"].includes(source)) {
+      setTestMessages(previous => previous.at(-1)?.role === "agent" && previous.at(-1)?.text === text
+        ? previous : [...previous, { role: "agent", text, timestamp: new Date().toISOString() }]);
+      setLastMentorMessage(text);
+      setBackgroundStatusMessage("");
+      setControlState("mentor_waiting_for_answer");
+      return;
+    }
+
     if (source === "user") {
       if (text.trim() === STARTUP_CONTINUATION_REQUEST) return;
       if (text.trim() === TURN_CONTINUATION_REQUEST) return;
@@ -677,6 +690,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const handleModeChange = (modeEvent: any) => {
+    if (courseTestMode) return;
     const nextMode = String(modeEvent?.mode ?? modeEvent ?? "").toLowerCase();
     debugMentorControls("mode event", modeEvent);
     appendDebugEvent("sdk", "mode changed", modeEvent);
@@ -804,7 +818,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   useEffect(() => {
-    if (!conversationRef.current) return;
+    if (courseTestMode || !conversationRef.current) return;
 
     clearPendingUnmute();
 
@@ -830,7 +844,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
 
     return clearPendingUnmute;
-  }, [mentorSessionState]);
+  }, [mentorSessionState, courseTestMode]);
 
   useEffect(() => {
     return () => {
@@ -957,6 +971,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setDebugEvents([]);
     debugEventIdRef.current = 0;
     if (mentorSessionState === "connecting" || isSessionActive) return;
+    setTestMessages([]);
     const sessionGeneration = ++sessionGenerationRef.current;
 
     pendingCurrentEvaluationRef.current = null;
@@ -1035,6 +1050,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         body: JSON.stringify({ data: signedData, sig: signedSig }),
       });
       const data = await res.json().catch(() => null);
+      if (courseTestMode && res.ok && (data?.session_mode !== "course_test" || data?.delivery !== "disabled")) {
+        throw new Error("This mentor service does not support isolated course testing yet.");
+      }
       const responseDebugMode = data?.debug?.debugMode === true;
       debugModeRef.current = responseDebugMode;
       setDebugMode(responseDebugMode);
@@ -1152,6 +1170,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       const convo = await Conversation.startSession({
         signedUrl: data.signed_url,
+        ...(courseTestMode ? { textOnly: true, overrides: { conversation: { textOnly: true } } } : {}),
         connectionType: "websocket",
         dynamicVariables,
         onConnect: () => {
@@ -1162,6 +1181,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           setSessionProgress(0);
           setSessionElapsedSeconds(0);
           setHasElevenLabsSessionStarted(true);
+          if (courseTestMode) setControlState("mentor_waiting_for_answer");
         },
         onDisconnect: (details: DisconnectionDetails) => {
           if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) {
@@ -1407,7 +1427,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               result,
               ...(message ? { message } : {}),
             });
-            void playAnswerFeedbackSound(result).catch((error) => {
+            if (!courseTestMode) void playAnswerFeedbackSound(result).catch((error) => {
               debugMentorControls("answer feedback sound failed", error);
             });
             if (previousReviewActiveRef.current) {
@@ -1746,7 +1766,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
 
-      {!isTokenSupportScreenVisible && (
+      {!isTokenSupportScreenVisible && !courseTestMode && (
         <MentorControlBar
           state={mentorSessionState}
           isMicMuted={isMicMuted}
@@ -1759,6 +1779,17 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       )}
     </div>
     {debugMode && <MentorDebugPanel events={debugEvents} />}
+    {courseTestMode && <MentorTestChat messages={testMessages}
+      sessionId={activeMentorSessionIdRef.current ?? undefined} lessonId={lessonId}
+      connected={hasElevenLabsSessionStarted}
+      onEnd={handleEndConversation}
+      onSend={async (text) => {
+        const conversation = conversationRef.current;
+        if (!conversation?.sendUserMessage) throw new Error("Mentor session is not connected.");
+        await conversation.sendUserMessage(text);
+        setControlState("mentor_thinking");
+        setTestMessages(previous => [...previous, { role: "user", text, timestamp: new Date().toISOString() }]);
+      }} />}
     </div>
   );
 };

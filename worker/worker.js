@@ -256,6 +256,17 @@ async function validateSignedLessonPayload(encoded, signature, env) {
     return { error: "Link expired", status: 410 };
   }
 
+  if (lessonData.sessionmode === "course_test") {
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(lessonData.testrunid || "") || !isIdOnlyLessonPayload(lessonData)) {
+      return { error: "Invalid course test payload", status: 403 };
+    }
+    const tester = await env.DB.prepare(`SELECT u.id FROM users u
+      JOIN subscriptions s ON s.userid = u.id JOIN lessons l ON l.courseid = s.courseid
+      WHERE u.id = ?1 AND s.id = ?2 AND s.courseid = ?3 AND l.id = ?4
+        AND u.is_test = 1 AND u.status = 'active'`)
+      .bind(lessonData.userid, lessonData.subscriptionid, lessonData.courseid, lessonData.lessonid).first();
+    if (!tester) return { error: "Course testing requires an active test account", status: 403 };
+  }
   return { lessonData };
 }
 
@@ -429,6 +440,7 @@ async function resolveMentorContext(lessonData, env) {
   };
   return {
     userid, subscriptionid, courseid, lessonid,
+    ...(lessonData.sessionmode === "course_test" ? { sessionmode: "course_test", testrunid: lessonData.testrunid } : {}),
     userfirstname: bounded(context.userfirstname || "Learner", 100),
     coursename: bounded(context.coursename, 200),
     lessonname: bounded(context.lessonname, 200),
@@ -909,6 +921,11 @@ export default {
         }
 
         const demoMode = isDemoLessonPayload(result.lessonData);
+        const courseTestMode = result.lessonData.sessionmode === "course_test";
+
+        if (courseTestMode && ["/usage", "/evaluation", "/coaching-outcome"].includes(pathname)) {
+          return jsonResponse({ success: true, courseTest: true, persisted: false }, 200, corsHeaders);
+        }
 
         if (pathname === "/consent") {
           if (!demoMode || !env.DEMO_ADMIN) return jsonResponse({ error: "Demo consent is unavailable." }, 400, corsHeaders);
@@ -944,7 +961,7 @@ export default {
         }
 
         const action = pathname === "/agent" ? "check_aimentor_usage" : "update_aimentor_usage";
-        const usageResult = demoMode
+        const usageResult = demoMode || courseTestMode
           ? { ok: true, status: 200, body: { success: true, demo: true } }
           : await handleAIMentorUsage(action, result.lessonData, env);
 
@@ -982,7 +999,9 @@ export default {
         const resolvedContext = await resolveMentorContext(result.lessonData, env);
         const idOnlyBootstrap = isIdOnlyLessonPayload(result.lessonData);
         const userDebugMode = isDebugMode(resolvedContext?.debugmode);
-        const mentorSessionId = demoMode
+        const mentorSessionId = courseTestMode
+          ? `course_test_${crypto.randomUUID()}`
+          : demoMode
           ? result.lessonData.demosessionid
           : idOnlyBootstrap ? await createMentorSession(resolvedContext, env) : null;
 
@@ -1037,6 +1056,7 @@ export default {
           {
             ...withDebugPayload(data, userDebugMode, tokenAvailability),
             mentor_context_mode: demoMode ? "demo" : idOnlyBootstrap ? "app_resolved" : "legacy_content",
+            ...(courseTestMode ? { session_mode: "course_test", delivery: "disabled" } : {}),
             ...(mentorSessionId ? { mentor_session_id: mentorSessionId } : {}),
           },
           res.status,

@@ -49,7 +49,7 @@ function App() {
     content?: string;
     signedData?: string;
     signedSig?: string;
-    sessionMode?: "demo" | "production";
+    sessionMode?: "demo" | "production" | "course_test";
     previousLessonEvaluation?: LessonEvaluation;
     sections: Array<{ title: string; content: string; type?: "text" | "code" | "tip" }>;
   }>({
@@ -141,7 +141,7 @@ function App() {
           content: json.content || "<p>No content available.</p>",
           signedData: data,
           signedSig: sig,
-          sessionMode: json.sessionmode === "demo" ? "demo" : "production",
+          sessionMode: json.sessionmode === "course_test" ? "course_test" : json.sessionmode === "demo" ? "demo" : "production",
           previousLessonEvaluation: parseLessonEvaluation(json.previouslessonevaluation) ?? undefined,
 
           sections: [
@@ -231,6 +231,7 @@ function App() {
             <div className="lg:col-span-2 order-1">
               <div className="lg:sticky lg:top-24">
                 <MentorPanel 
+                  courseTestMode={lessonData.sessionMode === "course_test"}
                   userfirstname={lessonData.userfirstname}
                   coursename={lessonData.courseName}
                   lessonname={lessonData.lessonName}
