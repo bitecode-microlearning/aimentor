@@ -221,9 +221,14 @@ export function LessonPresentationStage({ lessonName, slide, evaluation }: Lesso
       <div className="lesson-stage-heading"><Sparkles size={28} aria-hidden="true" /><p>Session complete</p></div>
       <h3>{slide.title && slide.title !== lessonName ? slide.title : "Your lesson result"}</h3>
       {renderEvaluation("current")}
+      {evaluation?.context === "current" && <p className="lesson-stage-supporting">
+        <strong>Session check: {evaluation.evaluation.correctAnswers} / {evaluation.evaluation.totalQuestions} correct.</strong>{' '}
+        This reflects your answers in this conversation. Try an independent task to check what you can apply without hints.
+      </p>}
       <SlideList items={slide.coveredTopics} />
       {slide.takeaway && <p className="lesson-stage-takeaway"><strong>Key takeaway:</strong> {slide.takeaway}</p>}
       <p className="lesson-stage-thanks">{slide.encouragement || "Thanks for taking part in this AI mentor session."}</p>
+      <p className="lesson-stage-supporting">This lesson is complete. You can end the session now, or ask a final question.</p>
     </section>
   );
 }

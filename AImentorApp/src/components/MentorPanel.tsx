@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Conversation, type DisconnectionDetails } from "@elevenlabs/client";
+import { Conversation, TextConversation, type DisconnectionDetails } from "@elevenlabs/client";
 
 declare const __APP_BUILD_INFO__: {
   version: string;
@@ -272,6 +272,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   onLessonEvaluationVisible,
   onLessonPresentationChange,
 }) => {
+  const isTextSession = courseTestMode;
+  const [hasReceivedAudio, setHasReceivedAudio] = useState(false);
+  const [audioStatusMessage, setAudioStatusMessage] = useState("");
   const [mentorSessionState, setMentorSessionState] = useState<MentorControlState>("idle");
   const [isMicMuted, setIsMicMuted] = useState(true);
   const [userManuallyMuted, setUserManuallyMuted] = useState(false);
@@ -423,6 +426,9 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const setMicrophoneMuted = (muted: boolean) => {
     clearPendingUnmute();
     setIsMicMuted(muted);
+    // Text-only conversations have no input audio track. Shared lesson tools
+    // still switch turns, but must never call the SDK microphone controls.
+    if (isTextSession) return;
     appendDebugEvent("audio", muted ? "microphone muted" : "microphone unmuted");
 
     try {
@@ -604,7 +610,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
     if (!text) return;
 
-    if (courseTestMode && ["ai", "agent", "assistant"].includes(source)) {
+    if (isTextSession && ["ai", "agent", "assistant"].includes(source)) {
       setTestMessages(previous => previous.at(-1)?.role === "agent" && previous.at(-1)?.text === text
         ? previous : [...previous, { role: "agent", text, timestamp: new Date().toISOString() }]);
       setLastMentorMessage(text);
@@ -690,7 +696,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   const handleModeChange = (modeEvent: any) => {
-    if (courseTestMode) return;
+    if (isTextSession) return;
     const nextMode = String(modeEvent?.mode ?? modeEvent ?? "").toLowerCase();
     debugMentorControls("mode event", modeEvent);
     appendDebugEvent("sdk", "mode changed", modeEvent);
@@ -818,7 +824,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   };
 
   useEffect(() => {
-    if (courseTestMode || !conversationRef.current) return;
+    if (isTextSession || !conversationRef.current) return;
 
     clearPendingUnmute();
 
@@ -844,7 +850,21 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     }
 
     return clearPendingUnmute;
-  }, [mentorSessionState, courseTestMode]);
+  }, [mentorSessionState, isTextSession]);
+
+  useEffect(() => {
+    setAudioStatusMessage("");
+    if (isTextSession || !hasElevenLabsSessionStarted) return;
+    if (hasReceivedAudio) {
+      appendDebugEvent("audio", "first mentor audio received");
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      appendDebugEvent("audio", "no mentor audio received within 15 seconds");
+      setAudioStatusMessage("The mentor connected, but no audio has arrived. Please end the session and try again.");
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [isTextSession, hasElevenLabsSessionStarted, hasReceivedAudio]);
 
   useEffect(() => {
     return () => {
@@ -1024,6 +1044,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
     setSessionProgress(0);
     setSessionElapsedSeconds(0);
     setHasElevenLabsSessionStarted(false);
+    setHasReceivedAudio(false);
     setConnectionStatusMessage("Loading mentor configuration...");
 
     try {
@@ -1168,9 +1189,11 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
 
       appendDebugEvent("parameters", "dynamic variables prepared", dynamicVariables);
 
-      const convo = await Conversation.startSession({
+      // Select the local client without overriding the agent's locked settings.
+      // Even a top-level textOnly flag is serialized as a server override by the SDK.
+      const sessionClient = isTextSession ? TextConversation : Conversation;
+      const convo = await sessionClient.startSession({
         signedUrl: data.signed_url,
-        ...(courseTestMode ? { textOnly: true, overrides: { conversation: { textOnly: true } } } : {}),
         connectionType: "websocket",
         dynamicVariables,
         onConnect: () => {
@@ -1181,7 +1204,13 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
           setSessionProgress(0);
           setSessionElapsedSeconds(0);
           setHasElevenLabsSessionStarted(true);
-          if (courseTestMode) setControlState("mentor_waiting_for_answer");
+          // Connection readiness must not depend on receiving an audio event.
+          setConnectionStatusMessage("");
+          setControlState(isTextSession ? "mentor_waiting_for_answer" : "waiting_for_audio");
+        },
+        onAudio: () => {
+          if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) return;
+          setHasReceivedAudio(true);
         },
         onDisconnect: (details: DisconnectionDetails) => {
           if (!isCurrentSessionGeneration(sessionGeneration, sessionGenerationRef.current)) {
@@ -1427,7 +1456,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               result,
               ...(message ? { message } : {}),
             });
-            if (!courseTestMode) void playAnswerFeedbackSound(result).catch((error) => {
+            if (!isTextSession) void playAnswerFeedbackSound(result).catch((error) => {
               debugMentorControls("answer feedback sound failed", error);
             });
             if (previousReviewActiveRef.current) {
@@ -1606,6 +1635,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
   const getStatusLabel = () => {
     if (backgroundStatusMessage) return backgroundStatusMessage;
     if (mentorSessionState === "connecting") return "Connecting...";
+    if (mentorSessionState === "waiting_for_audio") return "Connected. Waiting for mentor audio...";
     if (mentorSessionState === "mentor_speaking") return "Mentor is explaining...";
     if (mentorSessionState === "mentor_thinking") return "Agent is thinking...";
     if (mentorSessionState === "mentor_waiting_for_answer") return "Your turn";
@@ -1708,6 +1738,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
               )}
               {mentorSessionState === "connecting" && connectionStatusMessage && <span>{connectionStatusMessage}</span>}
               {errorMessage && <strong>{errorMessage}</strong>}
+              {!errorMessage && audioStatusMessage && <strong>{audioStatusMessage}</strong>}
             </div>
           </div>
           {isLessonTimerActive && (
@@ -1766,7 +1797,7 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
         </div>
       )}
 
-      {!isTokenSupportScreenVisible && !courseTestMode && (
+      {!isTokenSupportScreenVisible && !isTextSession && (
         <MentorControlBar
           state={mentorSessionState}
           isMicMuted={isMicMuted}
@@ -1779,16 +1810,26 @@ const MentorPanel: React.FC<MentorPanelProps> = ({
       )}
     </div>
     {debugMode && <MentorDebugPanel events={debugEvents} />}
-    {courseTestMode && <MentorTestChat messages={testMessages}
+    {isTextSession && <MentorTestChat messages={testMessages}
       sessionId={activeMentorSessionIdRef.current ?? undefined} lessonId={lessonId}
       connected={hasElevenLabsSessionStarted}
       onEnd={handleEndConversation}
       onSend={async (text) => {
         const conversation = conversationRef.current;
         if (!conversation?.sendUserMessage) throw new Error("Mentor session is not connected.");
-        await conversation.sendUserMessage(text);
+        const generation = sessionGenerationRef.current;
         setControlState("mentor_thinking");
-        setTestMessages(previous => [...previous, { role: "user", text, timestamp: new Date().toISOString() }]);
+        const userMessage = { role: "user" as const, text, timestamp: new Date().toISOString() };
+        setTestMessages(previous => [...previous, userMessage]);
+        try {
+          await conversation.sendUserMessage(text);
+        } catch (error) {
+          if (generation === sessionGenerationRef.current && conversationRef.current === conversation) {
+            setTestMessages(previous => previous.filter(message => message !== userMessage));
+            setControlState("mentor_waiting_for_answer");
+          }
+          throw error;
+        }
       }} />}
     </div>
   );

@@ -1,6 +1,7 @@
 export type MentorControlState =
   | "idle"
   | "connecting"
+  | "waiting_for_audio"
   | "mentor_speaking"
   | "mentor_thinking"
   | "user_question_mode"

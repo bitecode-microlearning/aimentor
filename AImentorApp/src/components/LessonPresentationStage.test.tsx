@@ -90,6 +90,8 @@ describe("LessonPresentationStage", () => {
     />);
     expect(screen.getAllByText("Understood").length).toBeGreaterThan(0);
     expect(screen.getByText("Tracing state")).toBeTruthy();
+    expect(screen.getByText("Session check: 2 / 3 correct.")).toBeTruthy();
+    expect(screen.getByText(/This lesson is complete/)).toBeTruthy();
     expect(screen.getByText(/Follow each mutation/)).toBeTruthy();
   });
 });

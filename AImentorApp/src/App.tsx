@@ -6,19 +6,8 @@ import  MentorPanel from "./components/MentorPanel";
 import { LessonContent } from "./components/LessonContent"; // ✅ named import
 import { Footer } from "./components/Footer";
 import { parseLessonEvaluation, type LessonEvaluation } from "./domain/lessonUnderstanding";
+import { learnerLessonSections } from "./domain/learnerLessonSections";
 import type { LessonPresentationSlide } from "./domain/lessonPresentation";
-
-function formatConcepts(value: unknown): string {
-  const text = String(value || "").trim();
-  if (!text) return "";
-  try {
-    const parsed = JSON.parse(text);
-    if (Array.isArray(parsed)) return parsed.map((item) => `- ${String(item)}`).join("\n");
-  } catch {
-    // The database also contains ordinary prose and newline-separated concept lists.
-  }
-  return text;
-}
 
 function App() {
   // 🔹 State for lesson data
@@ -144,21 +133,8 @@ function App() {
           sessionMode: json.sessionmode === "course_test" ? "course_test" : json.sessionmode === "demo" ? "demo" : "production",
           previousLessonEvaluation: parseLessonEvaluation(json.previouslessonevaluation) ?? undefined,
 
-          sections: [
-            json.lessongoal && { title: "Lesson goal", content: String(json.lessongoal), type: "tip" as const },
-            json.contentdescription && { title: "Topic overview", content: String(json.contentdescription), type: "text" as const },
-            json.concepts && { title: "Key concepts", content: formatConcepts(json.concepts), type: "text" as const },
-            json.codedescription && { title: "Code focus", content: String(json.codedescription), type: "text" as const },
-          ].filter(Boolean) as Array<{ title: string; content: string; type: "text" | "code" | "tip" }>,
+          sections: learnerLessonSections(json),
         };
-
-        if (!mapped.sections.length) {
-          mapped.sections = [{
-            title: "Lesson overview",
-            content: String(json.content || "No lesson overview is available yet."),
-            type: "text",
-          }];
-        }
 
         setLessonData(mapped);
       } catch (e) {
